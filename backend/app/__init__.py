@@ -1,1 +1,0 @@
-"""SignalShift backend package placeholder."""

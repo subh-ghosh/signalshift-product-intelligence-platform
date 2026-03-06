@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import List
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes import router, set_ml_service
 from app.services.ml_service import MLService
 
 
@@ -11,72 +11,21 @@ app = FastAPI(
     version="1.0"
 )
 
-# Load ML models once at startup
+
+# load ML service
 ml_service = MLService()
 
-
-# -----------------------------
-# Request Schemas
-# -----------------------------
-
-class ReviewRequest(BaseModel):
-    review: str
+# inject into routes
+set_ml_service(ml_service)
 
 
-class BatchReviewRequest(BaseModel):
-    reviews: List[str]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-# -----------------------------
-# Health Check
-# -----------------------------
-
-@app.get("/")
-def root():
-    return {"message": "SignalShift API is running"}
-
-
-@app.get("/health")
-def health():
-    return {"status": "healthy"}
-
-
-# -----------------------------
-# Analyze Single Review
-# -----------------------------
-
-@app.post("/analyze-review")
-def analyze_review(request: ReviewRequest):
-
-    result = ml_service.analyze_review(request.review)
-
-    return result
-
-
-# -----------------------------
-# Analyze Multiple Reviews
-# -----------------------------
-
-@app.post("/analyze-batch")
-def analyze_batch(request: BatchReviewRequest):
-
-    results = []
-
-    for review in request.reviews:
-        result = ml_service.analyze_review(review)
-        results.append(result)
-
-    return {
-        "total_reviews": len(results),
-        "results": results
-    }
-
-@app.post("/detect-issues")
-def detect_issues(request: BatchReviewRequest):
-
-    issues = ml_service.detect_issues(request.reviews)
-
-    return {
-        "total_reviews": len(request.reviews),
-        "top_issues": issues
-    }
+app.include_router(router)

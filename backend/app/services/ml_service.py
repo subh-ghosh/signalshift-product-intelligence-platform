@@ -1,5 +1,10 @@
 import joblib
-from ..ml.text_cleaner import clean_text
+import pickle
+import numpy as np
+
+from sentence_transformers import SentenceTransformer
+
+from app.ml.text_cleaner import clean_text
 
 
 class MLService:
@@ -8,52 +13,70 @@ class MLService:
 
         print("Loading ML models...")
 
+        # sentiment model
         self.sentiment_model = joblib.load("models/sentiment_model.joblib")
+
+        # tfidf vectorizer
         self.vectorizer = joblib.load("models/tfidf_vectorizer.joblib")
-        self.topic_model = joblib.load("models/topic_model.joblib")
+
+        print("Loading embedding model...")
+
+        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+        print("Loading topic embeddings...")
+
+        with open("models/topic_embeddings.pkl", "rb") as f:
+            data = pickle.load(f)
+
+        self.topics = data["topics"]
+        self.topic_embeddings = data["embeddings"]
 
         print("ML models loaded successfully.")
 
-    # -----------------------------
-    # Sentiment Prediction
-    # -----------------------------
-    def predict_sentiment(self, review: str):
+    # -------------------------
+    # Sentiment
+    # -------------------------
+
+    def predict_sentiment(self, review):
 
         cleaned = clean_text(review)
+
         vector = self.vectorizer.transform([cleaned])
+
         sentiment = self.sentiment_model.predict(vector)[0]
 
         return sentiment
 
-    # -----------------------------
-    # Topic Prediction
-    # -----------------------------
-    def predict_topic(self, review: str):
+    # -------------------------
+    # Topic detection
+    # -------------------------
+
+    def predict_topic(self, review):
 
         cleaned = clean_text(review)
-        topics, probs = self.topic_model.transform([cleaned])
-        topic_id = int(topics[0])
+        review_embedding = self.embedding_model.encode([cleaned])[0]
 
-        if topic_id == -1:
-            return {
-                "topic_id": -1,
-                "keywords": ["general"]
-            }
+        similarities = np.dot(self.topic_embeddings, review_embedding) / (
+            np.linalg.norm(self.topic_embeddings, axis=1) * np.linalg.norm(review_embedding)
+        )
 
-        topic_words = self.topic_model.get_topic(topic_id)
-        keywords = [word for word, _ in topic_words[:5]]
+        best_index = int(np.argmax(similarities))
+
+        topic = self.topics[best_index]
 
         return {
-            "topic_id": topic_id,
-            "keywords": keywords
+            "topic_id": best_index,
+            "keywords": topic
         }
 
-    # -----------------------------
-    # Full Analysis
-    # -----------------------------
-    def analyze_review(self, review: str):
+    # -------------------------
+    # Full analysis
+    # -------------------------
+
+    def analyze_review(self, review):
 
         sentiment = self.predict_sentiment(review)
+
         topic_info = self.predict_topic(review)
 
         return {
@@ -63,9 +86,10 @@ class MLService:
             "topic_keywords": topic_info["keywords"]
         }
 
-    # -----------------------------
-    # Issue Detection
-    # -----------------------------
+    # -------------------------
+    # Issue detection for batch
+    # -------------------------
+
     def detect_issues(self, reviews):
 
         issue_counter = {}
@@ -73,16 +97,10 @@ class MLService:
         for review in reviews:
 
             result = self.analyze_review(review)
-            topic_keywords = result["topic_keywords"]
 
-            if topic_keywords:
+            issue = result["topic_keywords"]
 
-                main_issue = topic_keywords[0]
-
-                if main_issue not in issue_counter:
-                    issue_counter[main_issue] = 0
-
-                issue_counter[main_issue] += 1
+            issue_counter[issue] = issue_counter.get(issue, 0) + 1
 
         sorted_issues = sorted(
             issue_counter.items(),

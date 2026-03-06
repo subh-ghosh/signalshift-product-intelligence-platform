@@ -7,7 +7,7 @@ import joblib
 # -----------------------------
 print("Loading cleaned dataset...")
 
-df = pd.read_csv("../../data/processed/cleaned_reviews.csv")
+df = pd.read_csv("data/processed/cleaned_reviews.csv")
 
 df = df.dropna(subset=["cleaned_content"])
 df["cleaned_content"] = df["cleaned_content"].astype(str)
@@ -22,48 +22,38 @@ print("Total reviews:", len(reviews))
 # -----------------------------
 print("Loading topic model...")
 
-topic_model = joblib.load("../../models/topic_model.joblib")
+topic_model = joblib.load("models/topic_model.joblib")
 
 
 # -----------------------------
-# Assign topics to reviews
+# Predict sentiment and filter
 # -----------------------------
-print("Assigning topics to reviews...")
-
-topics, probs = topic_model.transform(reviews)
-
-df["topic"] = topics
-
-
-# -----------------------------
-# Load sentiment model
-# -----------------------------
-print("Loading sentiment model...")
-
-sentiment_model = joblib.load("../../models/sentiment_model.joblib")
-vectorizer = joblib.load("../../models/tfidf_vectorizer.joblib")
-
-
-# -----------------------------
-# Predict sentiment
-# -----------------------------
-print("Predicting sentiment...")
+print("Getting sentiments to filter for negative reviews...")
+sentiment_model = joblib.load("models/sentiment_model.joblib")
+vectorizer = joblib.load("models/tfidf_vectorizer.joblib")
 
 X = vectorizer.transform(df["cleaned_content"])
+df["sentiment"] = sentiment_model.predict(X)
 
-sentiments = sentiment_model.predict(X)
-
-df["sentiment"] = sentiments
+# KEEP ONLY NEGATIVE REVIEWS
+negative_df = df[df["sentiment"] == "negative"].copy()
+negative_reviews = negative_df["cleaned_content"].tolist()
+print(f"Total NEGATIVE reviews for topic analysis: {len(negative_reviews)}")
 
 
 # -----------------------------
-# Compute topic statistics
+# Assign topics to negative reviews
 # -----------------------------
+print("Assigning topics to negative reviews...")
+
+topics, probs = topic_model.transform(negative_reviews)
+negative_df["topic"] = topics
+
 print("Computing topic statistics...")
 
 topic_stats = []
 
-topic_counts = df["topic"].value_counts()
+topic_counts = negative_df["topic"].value_counts()
 
 
 for topic_id, count in topic_counts.items():
@@ -72,15 +62,12 @@ for topic_id, count in topic_counts.items():
     if topic_id == -1:
         continue
 
-    topic_reviews = df[df["topic"] == topic_id]
+    topic_reviews = negative_df[negative_df["topic"] == topic_id]
 
-    negative = (topic_reviews["sentiment"] == "negative").sum()
-    positive = (topic_reviews["sentiment"] == "positive").sum()
-
-    neg_ratio = negative / len(topic_reviews)
-
-    # Impact score
-    impact_score = len(topic_reviews) * neg_ratio
+    negative = len(topic_reviews)
+    positive = 0
+    neg_ratio = 1.0
+    impact_score = negative
 
     # Topic keywords
     topic_words = topic_model.get_topic(topic_id)
@@ -92,11 +79,11 @@ for topic_id, count in topic_counts.items():
 
     topic_stats.append({
         "topic_id": topic_id,
-        "mentions": len(topic_reviews),
+        "mentions": negative,
         "negative_reviews": negative,
         "positive_reviews": positive,
-        "negative_ratio": round(neg_ratio, 2),
-        "impact_score": round(impact_score, 2),
+        "negative_ratio": neg_ratio,
+        "impact_score": impact_score,
         "keywords": ", ".join(keywords),
         "sample_reviews": sample_reviews
     })
@@ -125,7 +112,7 @@ print(topic_df.head(10))
 # Save results
 # -----------------------------
 topic_df.to_csv(
-    "../../data/processed/topic_analysis.csv",
+    "data/processed/topic_analysis.csv",
     index=False
 )
 

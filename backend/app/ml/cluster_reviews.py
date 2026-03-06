@@ -5,18 +5,29 @@ import joblib
 
 
 # -----------------------------
-# Load cleaned dataset
+# Load cleaned dataset and filter
 # -----------------------------
 print("Loading cleaned dataset...")
 
-df = pd.read_csv("../../data/processed/cleaned_reviews.csv")
+df = pd.read_csv("data/processed/cleaned_reviews.csv")
 
 df = df.dropna(subset=["cleaned_content"])
 df["cleaned_content"] = df["cleaned_content"].astype(str)
 
-reviews = df["cleaned_content"].tolist()
+print(f"Total reviews in dataset: {len(df)}")
 
-print("Total reviews:", len(reviews))
+print("Loading sentiment models to filter for negative reviews...")
+sentiment_model = joblib.load("models/sentiment_model.joblib")
+vectorizer = joblib.load("models/tfidf_vectorizer.joblib")
+
+print("Filtering for negative reviews...")
+X = vectorizer.transform(df["cleaned_content"])
+df["sentiment"] = sentiment_model.predict(X)
+
+negative_df = df[df["sentiment"] == "negative"]
+reviews = negative_df["cleaned_content"].tolist()
+
+print(f"Total NEGATIVE reviews for training: {len(reviews)}")
 
 
 # -----------------------------
@@ -61,6 +72,6 @@ print(topic_info.head(15))
 # -----------------------------
 print("\nSaving topic model...")
 
-joblib.dump(topic_model, "../../models/topic_model.joblib")
+joblib.dump(topic_model, "models/topic_model.joblib")
 
 print("Topic model saved successfully.")
