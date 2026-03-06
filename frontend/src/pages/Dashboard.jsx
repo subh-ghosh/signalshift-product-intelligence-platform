@@ -36,6 +36,16 @@ export default function Dashboard() {
                     setProgress(res.data)
                     setUploadLoading(true)
                     startPolling()
+                } else if (res.data.status === "complete") {
+                    // If a job was completed while the user was away, update state
+                    setUploadLoading(false)
+                    setRefreshKey(prev => prev + 1)
+                    fetchSyncStatus()
+                    setStatus("Analysis complete!")
+                    // Clear progress after short delay
+                    setTimeout(() => {
+                        setProgress({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
+                    }, 2000)
                 }
             } catch (e) {
                 console.error("Initial status check failed", e)
@@ -250,8 +260,15 @@ export default function Dashboard() {
                     </div>
                     <p style={{ fontSize: "14px", marginTop: "5px", color: "#666", display: "flex", justifyContent: "space-between" }}>
                         <span>
-                            <strong>{progress.status === "sentiment" ? "Step 1/2: Sentiment Analysis" : "Step 2/2: Extracting Issues"}</strong>:
-                            {' '}{progress.processed.toLocaleString()} / {progress.total.toLocaleString()} {progress.status === "sentiment" ? "reviews" : "negative reviews"}
+                            <strong>
+                                {progress.status === "downloading" ? "Step 0/3: Downloading Dataset" :
+                                    progress.status === "unzipping" ? "Step 0/3: Unzipping Dataset" :
+                                        progress.status === "sentiment" ? "Step 1/2: Sentiment Analysis" :
+                                            "Step 2/2: Extracting Issues"}
+                            </strong>:
+                            {' '}{progress.status === "downloading" || progress.status === "unzipping"
+                                ? `${progress.processed}%`
+                                : `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()} ${progress.status === "sentiment" ? "reviews" : "negative reviews"}`}
                             ({Math.round((progress.processed / progress.total) * 100)}%)
                         </span>
                         {uploadLoading && progress.eta_seconds > 0 && (

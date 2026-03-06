@@ -204,18 +204,45 @@ def get_sync_status():
 
 @router.post("/sync/kaggle")
 def sync_kaggle(background_tasks: BackgroundTasks):
-    """Triggers a download from Kaggle and starts analysis"""
+    """Triggers a download from Kaggle and starts analysis in the background"""
     if ml_service is None:
         return {"error": "ML service not initialized"}
         
+    # Initialize progress for the download phase immediately
+    ml_service.progress["processed"] = 0
+    ml_service.progress["total"] = 100
+    ml_service.progress["status"] = "downloading"
+    ml_service.progress["eta_seconds"] = 0
+
+    # Offload the entire sync + analysis process to a background job
+    background_tasks.add_task(_process_kaggle_sync_job)
+    
+    return {
+        "message": "Kaggle sync started. Tracking download progress...",
+        "status": "pending"
+    }
+
+
+# -----------------------------
+# Background Processing
+# -----------------------------
+
+def _process_kaggle_sync_job():
+    """Background job for Kaggle sync: Download -> Load -> Analyze"""
     try:
+        # 0. Define progress callback for sync
+        def sync_progress_callback(processed, total, status):
+            ml_service.progress["processed"] = processed
+            ml_service.progress["total"] = total
+            ml_service.progress["status"] = status
+            ml_service.progress["eta_seconds"] = 0 
+
         # 1. Download from Kaggle
-        file_path = sync_service.sync_from_kaggle()
+        file_path = sync_service.sync_from_kaggle(progress_callback=sync_progress_callback)
         
         # 2. Load and process
         df = pd.read_csv(file_path)
         
-        # Standardize column name (assuming 'content' or 'review' as per implementation_plan)
         possible_columns = ["content", "review", "text", "comment"]
         review_column = None
         for col in possible_columns:
@@ -223,31 +250,18 @@ def sync_kaggle(background_tasks: BackgroundTasks):
                 review_column = col
                 break
 
-        if review_column is None:
-            return {"error": "Dataset missing review column"}
-
-        df["content"] = df[review_column]
-        
-        # 3. Initialize progress
-        ml_service.progress["total"] = len(df)
-        ml_service.progress["processed"] = 0
-        ml_service.progress["status"] = "sentiment"
-        ml_service.progress["eta_seconds"] = 0
-        
-        # 4. Start analysis in background
-        background_tasks.add_task(_process_reviews_job, df)
-        
-        return {
-            "message": "Kaggle sync started successfully. AI Analysis running in background.",
-            "total_reviews": len(df)
-        }
+        if review_column:
+            df["content"] = df[review_column]
+            # 3. Hand off to the standard analysis job
+            _process_reviews_job(df)
+        else:
+            print("Dataset missing review column during Kaggle sync.")
+            ml_service.progress["status"] = "error"
+            
     except Exception as e:
-        return {"error": str(e)}
+        print(f"Kaggle Sync job failed: {e}")
+        ml_service.progress["status"] = "error"
 
-
-# -----------------------------
-# Background Processing
-# -----------------------------
 
 def _process_reviews_job(df: pd.DataFrame):
     """Heavy processing task that runs in the background with stop support"""
