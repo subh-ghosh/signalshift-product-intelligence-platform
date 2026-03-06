@@ -4,149 +4,295 @@ import api from "../services/api"
 import SentimentChart from "../components/SentimentChart"
 import TopIssuesChart from "../components/TopIssuesChart"
 
-export default function Dashboard(){
+export default function Dashboard() {
 
- const [file,setFile] = useState(null)
- const [status,setStatus] = useState("")
- const [reviews,setReviews] = useState([])
- const [issue,setIssue] = useState("")
- const [loading,setLoading] = useState(false)
+    const [file, setFile] = useState(null)
+    const [status, setStatus] = useState("")
+    const [reviews, setReviews] = useState([])
+    const [issue, setIssue] = useState("")
+    const [uploadLoading, setUploadLoading] = useState(false)
+    const [chartsLoading, setChartsLoading] = useState(false)
+    const [refreshKey, setRefreshKey] = useState(0)
+    const [progress, setProgress] = useState({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
 
- const handleUpload = async () => {
+    // Check for active jobs on load
+    useState(() => {
+        const checkInitialStatus = async () => {
+            try {
+                const res = await api.get("/upload-progress")
+                if (res.data.status === "sentiment" || res.data.status === "processing") {
+                    setProgress(res.data)
+                    setUploadLoading(true)
+                    startPolling()
+                }
+            } catch (e) {
+                console.error("Initial status check failed", e)
+            }
+        }
+        checkInitialStatus()
+    }, [])
 
-  if(!file){
-   setStatus("Please select a file")
-   return
-  }
+    let progressInterval;
 
-  const formData = new FormData()
-  formData.append("file",file)
+    const startPolling = async () => {
+        if (progressInterval) clearInterval(progressInterval);
 
-  try{
+        return new Promise((resolve, reject) => {
+            let failCount = 0;
+            progressInterval = setInterval(async () => {
+                try {
+                    const res = await api.get("/upload-progress")
+                    setProgress(res.data)
+                    failCount = 0;
 
-   setLoading(true)
+                    if (res.data.status === "complete" || res.data.status === "idle") {
+                        clearInterval(progressInterval)
+                        resolve()
+                    }
 
-   await api.post("/upload-reviews",formData)
+                    if (res.data.status === "error") {
+                        clearInterval(progressInterval)
+                        reject(new Error("AI analysis failed"))
+                    }
+                } catch (e) {
+                    failCount++;
+                    if (failCount > 5) {
+                        clearInterval(progressInterval)
+                        reject(new Error("Connection lost"))
+                    }
+                }
+            }, 1500)
+        })
+    }
 
-   setStatus("Upload successful")
+    const handleStop = async () => {
+        try {
+            setStatus("Stopping analysis early...")
+            await api.post("/stop-upload")
+        } catch (e) {
+            console.error("Failed to stop analysis", e)
+        }
+    }
 
-  }catch(err){
+    const handleUpload = async () => {
 
-   console.error(err)
+        if (!file) {
+            setStatus("Please select a file")
+            return
+        }
 
-   setStatus("Upload failed")
+        const formData = new FormData()
+        formData.append("file", file)
 
-  }finally{
+        try {
 
-   setLoading(false)
+            setUploadLoading(true)
+            setStatus("Initiating upload...")
+            setIssue("")
+            setReviews([])
+            setProgress({ processed: 0, total: 0, status: "sentiment", eta_seconds: 0 })
 
-  }
+            // POST returns fast now because work is offloaded to BackgroundTasks
+            await api.post("/upload-reviews", formData)
+            setStatus("Upload received! Analyzing in background...")
 
- }
+            // Wait for centralized polling to finish
+            await startPolling()
 
+            setStatus("Success! Analysis complete.")
 
- const handleIssueClick = async (keywords) => {
+            // Force charts to remount and fetch the newly generated cache
+            setRefreshKey(prev => prev + 1)
 
-  try{
+            setTimeout(() => setStatus(""), 5000)
 
-   setLoading(true)
+        } catch (err) {
 
-   setIssue(keywords)
+            console.error(err)
+            setStatus("Analysis failed or connection interrupted")
 
-   const res = await api.get("/dashboard/issue-reviews",{
-    params:{issue:keywords}
-   })
+        } finally {
 
-   setReviews(res.data.reviews || [])
+            setUploadLoading(false)
 
-  }catch(err){
+        }
 
-   console.error(err)
-
-   setReviews([])
-
-  }finally{
-
-   setLoading(false)
-
-  }
-
- }
+    }
 
 
- return(
+    const handleIssueClick = async (keywords) => {
 
-  <div style={{padding:"40px",maxWidth:"1200px",margin:"auto"}}>
+        try {
 
-   <h1>Netflix Dashboard</h1>
+            setChartsLoading(true)
 
-   {/* Upload Section */}
+            setIssue(keywords)
 
-   <h2>Upload Latest Reviews</h2>
+            const res = await api.get("/dashboard/issue-reviews", {
+                params: { issue: keywords }
+            })
 
-   <input
-    type="file"
-    onChange={(e)=>setFile(e.target.files[0])}
-   />
+            setReviews(res.data.reviews || [])
 
-   <button
-    onClick={handleUpload}
-    disabled={loading}
-    style={{marginLeft:"10px"}}
-   >
-    Upload
-   </button>
+        } catch (err) {
 
-   <p>{status}</p>
+            console.error(err)
 
-   <hr/>
+            setReviews([])
 
-   {/* Sentiment Chart */}
+        } finally {
 
-   <h2>Sentiment Distribution</h2>
+            setChartsLoading(false)
 
-   <SentimentChart/>
+        }
 
-   <hr/>
+    }
 
-   {/* Top Issues */}
 
-   <h2>Top Issues</h2>
+    return (
 
-   <TopIssuesChart onIssueClick={handleIssueClick}/>
+        <div style={{ padding: "40px", maxWidth: "1200px", margin: "auto" }}>
 
-   <hr/>
+            <h1>Netflix Dashboard</h1>
 
-   {/* Reviews */}
+            {/* Upload Section */}
 
-   {loading && <p>Loading reviews...</p>}
+            <h2>Upload Latest Reviews</h2>
 
-   {reviews.length > 0 && (
+            <input
+                type="file"
+                onChange={(e) => setFile(e.target.files[0])}
+            />
 
-    <div>
+            <button
+                onClick={handleUpload}
+                disabled={uploadLoading}
+                style={{
+                    marginLeft: "10px",
+                    padding: "8px 16px",
+                    backgroundColor: uploadLoading ? "#ccc" : "#E50914",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: uploadLoading ? "not-allowed" : "pointer",
+                    fontWeight: "bold"
+                }}
+            >
+                {uploadLoading ? "⏳ Analyzing & Extracting Issues..." : "Upload & Analyze"}
+            </button>
 
-     <h3>Reviews for: {issue}</h3>
+            {uploadLoading && progress.total > 0 && (
+                <div style={{ marginTop: "20px", width: "100%", maxWidth: "500px" }}>
+                    <div style={{
+                        width: "100%",
+                        height: "20px",
+                        backgroundColor: "#eee",
+                        borderRadius: "10px",
+                        overflow: "hidden",
+                        border: "1px solid #ddd"
+                    }}>
+                        <div style={{
+                            width: `${(progress.processed / progress.total) * 100}%`,
+                            height: "100%",
+                            backgroundColor: "#E50914",
+                            transition: "width 0.3s ease"
+                        }} />
+                    </div>
+                    <p style={{ fontSize: "14px", marginTop: "5px", color: "#666", display: "flex", justifyContent: "space-between" }}>
+                        <span>
+                            <strong>{progress.status === "sentiment" ? "Step 1/2: Sentiment Analysis" : "Step 2/2: Extracting Issues"}</strong>:
+                            {' '}{progress.processed.toLocaleString()} / {progress.total.toLocaleString()} {progress.status === "sentiment" ? "reviews" : "negative reviews"}
+                            ({Math.round((progress.processed / progress.total) * 100)}%)
+                        </span>
+                        {uploadLoading && progress.eta_seconds > 0 && (
+                            <span style={{ fontWeight: "bold", color: "#E50914" }}>
+                                ETA: {progress.eta_seconds > 60
+                                    ? `${Math.floor(progress.eta_seconds / 60)}m ${progress.eta_seconds % 60}s`
+                                    : `${progress.eta_seconds}s`} remaining
+                            </span>
+                        )}
+                    </p>
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "10px" }}>
+                        <button
+                            onClick={handleStop}
+                            style={{
+                                padding: "4px 12px",
+                                backgroundColor: "transparent",
+                                color: "#E50914",
+                                border: "1px solid #E50914",
+                                borderRadius: "4px",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                                fontWeight: "bold"
+                            }}
+                        >
+                            🛑 Stop Early
+                        </button>
+                        <span style={{ fontSize: "12px", color: "#999" }}>
+                            (Dashboard will show results processed so far)
+                        </span>
+                    </div>
+                </div>
+            )}
 
-     <ul style={{
-      maxHeight:"300px",
-      overflowY:"auto",
-      border:"1px solid #ddd",
-      padding:"10px"
-     }}>
+            {status && (
+                <p style={{
+                    marginTop: "10px",
+                    fontWeight: "500",
+                    color: status.includes("failed") ? "red" : "#2E7D32"
+                }}>
+                    {status}
+                </p>
+            )}
 
-      {reviews.map((r,i)=>(
-       <li key={i} style={{marginBottom:"10px"}}>
-        {r}
-       </li>
-      ))}
+            <hr />
 
-     </ul>
+            {/* Sentiment Chart */}
 
-    </div>
+            <h2>Sentiment Distribution</h2>
 
-   )}
+            <SentimentChart key={`sent-${refreshKey}`} />
 
-  </div>
+            <hr />
 
- )
+            {/* Top Issues */}
+
+            <h2>Top Issues</h2>
+
+            <TopIssuesChart key={`issues-${refreshKey}`} onIssueClick={handleIssueClick} />
+
+            <hr />
+
+            {/* Reviews */}
+
+            {chartsLoading && <p>Loading reviews...</p>}
+
+            {reviews.length > 0 && (
+
+                <div>
+
+                    <h3>Reviews for: {issue}</h3>
+
+                    <ul style={{
+                        maxHeight: "300px",
+                        overflowY: "auto",
+                        border: "1px solid #ddd",
+                        padding: "10px"
+                    }}>
+
+                        {reviews.map((r, i) => (
+                            <li key={i} style={{ marginBottom: "10px" }}>
+                                {r}
+                            </li>
+                        ))}
+
+                    </ul>
+
+                </div>
+
+            )}
+
+        </div>
+
+    )
 }

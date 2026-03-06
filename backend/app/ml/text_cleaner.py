@@ -5,10 +5,15 @@ import spacy
 nlp = spacy.load("en_core_web_sm")
 
 
-def clean_text(text: str) -> str:
+def clean_text(text) -> str:
     """
-    Clean and normalize text for ML processing
+    Clean and normalize text for ML processing. Handles NaN/float inputs.
     """
+    if not isinstance(text, str):
+        text = str(text) if text is not None else ""
+    
+    if not text.strip():
+        return ""
 
     text = text.lower()
 
