@@ -56,6 +56,18 @@ export default function Dashboard() {
 
     let progressInterval;
 
+    const onAnalysisComplete = (finalStatus = "Success! Analysis complete.") => {
+        setUploadLoading(false)
+        setRefreshKey(prev => prev + 1)
+        fetchSyncStatus()
+        setStatus(finalStatus)
+        // Clear status and progress after a while
+        setTimeout(() => {
+            setStatus("")
+            setProgress({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
+        }, 3000)
+    }
+
     const startPolling = async () => {
         if (progressInterval) clearInterval(progressInterval);
 
@@ -69,17 +81,22 @@ export default function Dashboard() {
 
                     if (res.data.status === "complete" || res.data.status === "idle") {
                         clearInterval(progressInterval)
+                        onAnalysisComplete(res.data.status === "complete" ? "Analysis complete!" : "")
                         resolve()
                     }
 
                     if (res.data.status === "error") {
                         clearInterval(progressInterval)
+                        setUploadLoading(false)
+                        setStatus("Analysis failed")
                         reject(new Error("AI analysis failed"))
                     }
                 } catch (e) {
                     failCount++;
                     if (failCount > 5) {
                         clearInterval(progressInterval)
+                        setUploadLoading(false)
+                        setStatus("Connection lost")
                         reject(new Error("Connection lost"))
                     }
                 }
@@ -97,7 +114,6 @@ export default function Dashboard() {
     }
 
     const handleUpload = async () => {
-
         if (!file) {
             setStatus("Please select a file")
             return
@@ -107,38 +123,21 @@ export default function Dashboard() {
         formData.append("file", file)
 
         try {
-
             setUploadLoading(true)
             setStatus("Initiating upload...")
             setIssue("")
             setReviews([])
             setProgress({ processed: 0, total: 0, status: "sentiment", eta_seconds: 0 })
 
-            // POST returns fast now because work is offloaded to BackgroundTasks
             await api.post("/upload-reviews", formData)
             setStatus("Upload received! Analyzing in background...")
 
-            // Wait for centralized polling to finish
             await startPolling()
-
-            setStatus("Success! Analysis complete.")
-
-            // Force charts to remount and fetch the newly generated cache
-            setRefreshKey(prev => prev + 1)
-
-            setTimeout(() => setStatus(""), 5000)
-
         } catch (err) {
-
             console.error(err)
             setStatus("Analysis failed or connection interrupted")
-
-        } finally {
-
             setUploadLoading(false)
-
         }
-
     }
 
     const handleKaggleSync = async () => {
@@ -148,7 +147,7 @@ export default function Dashboard() {
             const res = await api.post("/sync/kaggle")
             setStatus(res.data.message || "Sync started!")
             fetchSyncStatus()
-            startPolling()
+            await startPolling()
         } catch (err) {
             console.error(err)
             setStatus("Kaggle Sync failed")
