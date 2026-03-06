@@ -14,10 +14,22 @@ export default function Dashboard() {
     const [chartsLoading, setChartsLoading] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
     const [progress, setProgress] = useState({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
+    const [syncStatus, setSyncStatus] = useState(null)
+
+    // Fetch sync status on load
+    const fetchSyncStatus = async () => {
+        try {
+            const res = await api.get("/sync/status")
+            setSyncStatus(res.data)
+        } catch (e) {
+            console.error("Failed to fetch sync status", e)
+        }
+    }
 
     // Check for active jobs on load
     useState(() => {
         const checkInitialStatus = async () => {
+            fetchSyncStatus()
             try {
                 const res = await api.get("/upload-progress")
                 if (res.data.status === "sentiment" || res.data.status === "processing") {
@@ -119,6 +131,20 @@ export default function Dashboard() {
 
     }
 
+    const handleKaggleSync = async () => {
+        try {
+            setUploadLoading(true)
+            setStatus("Connecting to Kaggle...")
+            const res = await api.post("/sync/kaggle")
+            setStatus(res.data.message || "Sync started!")
+            fetchSyncStatus()
+            startPolling()
+        } catch (err) {
+            console.error(err)
+            setStatus("Kaggle Sync failed")
+            setUploadLoading(false)
+        }
+    }
 
     const handleIssueClick = async (keywords) => {
 
@@ -180,6 +206,30 @@ export default function Dashboard() {
             >
                 {uploadLoading ? "⏳ Analyzing & Extracting Issues..." : "Upload & Analyze"}
             </button>
+
+            <span style={{ margin: "0 15px", color: "#666" }}>OR</span>
+
+            <button
+                onClick={handleKaggleSync}
+                disabled={uploadLoading}
+                style={{
+                    padding: "8px 16px",
+                    backgroundColor: "transparent",
+                    color: uploadLoading ? "#666" : "#E50914",
+                    border: `1px solid ${uploadLoading ? "#ccc" : "#E50914"}`,
+                    borderRadius: "4px",
+                    cursor: uploadLoading ? "not-allowed" : "pointer",
+                    fontWeight: "bold"
+                }}
+            >
+                🔄 Sync Latest from Kaggle
+            </button>
+
+            {syncStatus?.last_sync && (
+                <div style={{ fontSize: "12px", color: "#666", marginTop: "10px" }}>
+                    Last Kaggle Sync: <strong>{new Date(syncStatus.last_sync).toLocaleString()}</strong>
+                </div>
+            )}
 
             {uploadLoading && progress.total > 0 && (
                 <div style={{ marginTop: "20px", width: "100%", maxWidth: "500px" }}>

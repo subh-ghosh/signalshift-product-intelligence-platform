@@ -5,11 +5,12 @@ import pandas as pd
 import os
 
 from app.services.csv_processor import process_uploaded_csv
+from app.services.data_sync_service import DataSyncService
 
 router = APIRouter()
 
 ml_service = None
-
+sync_service = DataSyncService()
 
 def set_ml_service(service):
     global ml_service
@@ -190,6 +191,58 @@ def stop_upload():
         return {"error": "ML service not initialized"}
     ml_service.stop_analysis()
     return {"message": "Stopping analysis..."}
+
+
+# -----------------------------
+# Sync Control
+# -----------------------------
+
+@router.get("/sync/status")
+def get_sync_status():
+    return sync_service.get_sync_status()
+
+
+@router.post("/sync/kaggle")
+def sync_kaggle(background_tasks: BackgroundTasks):
+    """Triggers a download from Kaggle and starts analysis"""
+    if ml_service is None:
+        return {"error": "ML service not initialized"}
+        
+    try:
+        # 1. Download from Kaggle
+        file_path = sync_service.sync_from_kaggle()
+        
+        # 2. Load and process
+        df = pd.read_csv(file_path)
+        
+        # Standardize column name (assuming 'content' or 'review' as per implementation_plan)
+        possible_columns = ["content", "review", "text", "comment"]
+        review_column = None
+        for col in possible_columns:
+            if col in df.columns:
+                review_column = col
+                break
+
+        if review_column is None:
+            return {"error": "Dataset missing review column"}
+
+        df["content"] = df[review_column]
+        
+        # 3. Initialize progress
+        ml_service.progress["total"] = len(df)
+        ml_service.progress["processed"] = 0
+        ml_service.progress["status"] = "sentiment"
+        ml_service.progress["eta_seconds"] = 0
+        
+        # 4. Start analysis in background
+        background_tasks.add_task(_process_reviews_job, df)
+        
+        return {
+            "message": "Kaggle sync started successfully. AI Analysis running in background.",
+            "total_reviews": len(df)
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # -----------------------------
