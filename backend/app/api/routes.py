@@ -133,6 +133,19 @@ def top_issues():
     except FileNotFoundError:
         return []
 
+
+# -----------------------------
+# TOP ASPECTS (ABSA)
+# -----------------------------
+
+@router.get("/dashboard/aspects")
+def top_aspects():
+    try:
+        aspect_df = pd.read_csv("data/processed/aspect_analysis.csv")
+        return aspect_df.to_dict(orient="records")
+    except FileNotFoundError:
+        return []
+
 # -----------------------------
 # REVIEWS FOR ISSUE
 # -----------------------------

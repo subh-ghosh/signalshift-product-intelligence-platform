@@ -1,6 +1,7 @@
 import joblib
 import pickle
 import time
+import os
 import numpy as np
 
 from sentence_transformers import SentenceTransformer
@@ -14,23 +15,27 @@ class MLService:
 
         print("Loading ML models...")
 
-        # sentiment model
-        self.sentiment_model = joblib.load("models/sentiment_model.joblib")
+        # Robust path detection
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        MODEL_DIR = os.path.join(BASE_DIR, "models")
 
-        # tfidf vectorizer
-        self.vectorizer = joblib.load("models/tfidf_vectorizer.joblib")
+        # sentiment model v2 (Bi-gram optimized)
+        self.sentiment_model = joblib.load(os.path.join(MODEL_DIR, "sentiment_model_v2.joblib"))
 
-        print("Loading embedding model...")
+        # tfidf vectorizer v2
+        self.vectorizer = joblib.load(os.path.join(MODEL_DIR, "tfidf_vectorizer_v2.joblib"))
 
-        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        print("Loading topic model (LDA)...")
 
-        print("Loading topic embeddings...")
+        self.lda_model = joblib.load(os.path.join(MODEL_DIR, "lda_model.joblib"))
+        self.count_vectorizer = joblib.load(os.path.join(MODEL_DIR, "count_vectorizer.joblib"))
 
-        with open("models/topic_embeddings.pkl", "rb") as f:
-            data = pickle.load(f)
-
-        self.topics = data["topics"]
-        self.topic_embeddings = data["embeddings"]
+        # Pre-extract keywords for each LDA topic for fast lookup
+        self.topic_keywords = []
+        feature_names = self.count_vectorizer.get_feature_names_out()
+        for topic_idx, topic in enumerate(self.lda_model.components_):
+            top_words = [feature_names[i] for i in topic.argsort()[:-6:-1]]
+            self.topic_keywords.append(", ".join(top_words))
         
         # Progress tracking for large uploads
         self.progress = {
@@ -41,6 +46,15 @@ class MLService:
             "start_time": None
         }
         self.should_stop = False
+
+        # Aspect-Based Sentiment Analysis (ABSA) Logic
+        # These categories allow B2B customers to see WHY people are unhappy
+        self.aspect_config = {
+            "Performance/Technical": ["crash", "lag", "buffer", "freeze", "slow", "loading", "error", "bug"],
+            "Content/Library": ["movie", "show", "series", "selection", "episodes", "watch", "boring"],
+            "UI/UX Experience": ["interface", "design", "navigation", "button", "screen", "search", "easy"],
+            "Pricing/Subscription": ["expensive", "price", "money", "subscription", "plan", "cancel", "worth"],
+        }
 
     print("ML models loaded successfully.")
 
@@ -121,21 +135,33 @@ class MLService:
     def predict_topic(self, review):
 
         cleaned = clean_text(review)
-        review_embedding = self.embedding_model.encode([cleaned])[0]
-
-        # Cosine similarity
-        similarities = np.dot(self.topic_embeddings, review_embedding) / (
-            np.linalg.norm(self.topic_embeddings, axis=1) * np.linalg.norm(review_embedding)
-        )
-
-        best_index = int(np.argmax(similarities))
-
-        topic = self.topics[best_index]
+        
+        # Use LDA instead of embeddings
+        counts = self.count_vectorizer.transform([cleaned])
+        topic_probs = self.lda_model.transform(counts)[0]
+        
+        best_index = int(np.argmax(topic_probs))
+        keywords = self.topic_keywords[best_index]
 
         return {
             "topic_id": best_index,
-            "keywords": topic
+            "keywords": keywords
         }
+
+    # -------------------------
+    # Aspect Detection (ABSA)
+    # -------------------------
+
+    def analyze_aspects(self, review):
+        """Identifies specific business areas mentioned in the review"""
+        text = review.lower()
+        detected = []
+        
+        for aspect, keywords in self.aspect_config.items():
+            if any(word in text for word in keywords):
+                detected.append(aspect)
+                
+        return detected if detected else ["General"]
 
     # -------------------------
     # Full analysis
@@ -144,14 +170,15 @@ class MLService:
     def analyze_review(self, review):
 
         sentiment = self.predict_sentiment(review)
-
         topic_info = self.predict_topic(review)
+        aspects = self.analyze_aspects(review)
 
         return {
             "review": review,
             "sentiment": sentiment,
             "topic_id": topic_info["topic_id"],
-            "topic_keywords": topic_info["keywords"]
+            "topic_keywords": topic_info["keywords"],
+            "aspects": aspects
         }
 
     # -------------------------
@@ -219,8 +246,10 @@ class MLService:
             
         reviews = negative_df["content"].astype(str).tolist()
         topic_stats = {}
+        aspect_stats = {aspect: 0 for aspect in self.aspect_config.keys()}
+        aspect_stats["General"] = 0
         
-        batch_size = 128
+        batch_size = 512 # LDA is much faster than BERT
         for i in range(0, total_negative, batch_size):
             if self.should_stop:
                 print(f"Topic analysis stopped at {i} reviews.")
@@ -230,24 +259,20 @@ class MLService:
                 batch_reviews = reviews[i:i + batch_size]
                 cleaned_batch = [clean_text(r) for r in batch_reviews]
                 
-                # Vectorized batch encoding (CRITICAL for performance)
-                batch_embeddings = self.embedding_model.encode(cleaned_batch)
+                # Transform whole batch via LDA
+                counts = self.count_vectorizer.transform(cleaned_batch)
+                topic_dist = self.lda_model.transform(counts)
                 
-                # Calculate similarities for the whole batch at once
-                for j, review_embedding in enumerate(batch_embeddings):
-                    # Cosine similarity
-                    norm_topics = np.linalg.norm(self.topic_embeddings, axis=1)
-                    norm_review = np.linalg.norm(review_embedding)
+                # Assign topics and aspects
+                for j, dist in enumerate(topic_dist):
+                    t_id = int(np.argmax(dist))
+                    keywords = self.topic_keywords[t_id]
                     
-                    if norm_review == 0:
-                        continue
-                        
-                    similarities = np.dot(self.topic_embeddings, review_embedding) / (norm_topics * norm_review)
-                    best_index = int(np.argmax(similarities))
-                    
-                    t_id = best_index
-                    keywords = self.topics[t_id]
-                    
+                    # Track Aspects for ABSA
+                    aspects = self.analyze_aspects(batch_reviews[j])
+                    for aspect in aspects:
+                        aspect_stats[aspect] += 1
+
                     if t_id not in topic_stats:
                         topic_stats[t_id] = {
                             "keywords": keywords,
@@ -281,5 +306,9 @@ class MLService:
         cache_df = pd.DataFrame(rows).sort_values(by="mentions", ascending=False)
         cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
         
+        # Save Aspect Stats for Dashboard Heatmap
+        aspect_rows = [{"aspect": k, "mentions": v} for k, v in aspect_stats.items()]
+        pd.DataFrame(aspect_rows).to_csv("data/processed/aspect_analysis.csv", index=False)
+
         self.progress["status"] = "complete"
         print(f"Successfully generated and cached new topic_analysis.csv for {total_negative} reviews.")
