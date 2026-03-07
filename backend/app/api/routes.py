@@ -8,6 +8,7 @@ from app.services.csv_processor import process_uploaded_csv
 from app.services.data_sync_service import DataSyncService
 from app.services.report_service import ReportService
 from app.services.alerting_service import AlertingService
+from app.services.ai_summary_service import ai_summary_service
 from fastapi.responses import FileResponse
 
 router = APIRouter()
@@ -159,6 +160,16 @@ def top_aspects():
 async def get_alerts():
     """Returns any active threshold alerts."""
     return {"alerts": alerting_service.get_active_alerts()}
+
+@router.get("/dashboard/ai-summary")
+def get_ai_summary():
+    """Returns the generated AI Executive Summary markdown."""
+    try:
+        summary_md = ai_summary_service.generate_executive_summary()
+        return {"summary": summary_md}
+    except Exception as e:
+         print(f"Error serving AI Summary: {e}")
+         return {"summary": "> **System Offline:** Could not fetch insights."}
 
 @router.get("/dashboard/topic-benchmark")
 def get_topic_benchmark():

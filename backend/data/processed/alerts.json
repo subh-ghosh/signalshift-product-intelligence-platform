@@ -1,21 +1,21 @@
 {
     "alerts": [
         {
-            "id": "alert_1772921187_Content/Library",
+            "id": "alert_1772922043_Content/Library",
             "type": "aspect_spike",
             "category": "Content/Library",
-            "message": "Critical spike detected in Content/Library (27.9% of complaints).",
+            "message": "Critical spike detected in Content/Library (27.4% of complaints).",
             "severity": "high",
-            "timestamp": "2026-03-08T03:36:27.155168"
+            "timestamp": "2026-03-08T03:50:43.557953"
         },
         {
-            "id": "alert_1772921187_General",
+            "id": "alert_1772922043_General",
             "type": "aspect_spike",
             "category": "General",
-            "message": "Critical spike detected in General (31.6% of complaints).",
+            "message": "Critical spike detected in General (32.6% of complaints).",
             "severity": "high",
-            "timestamp": "2026-03-08T03:36:27.155325"
+            "timestamp": "2026-03-08T03:50:43.558153"
         }
     ],
-    "last_check": "2026-03-08T03:36:27.155420"
+    "last_check": "2026-03-08T03:50:43.558249"
 }
