@@ -7,6 +7,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 from app.ml.text_cleaner import clean_text
+from .alerting_service import AlertingService
 
 
 class MLService:
