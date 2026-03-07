@@ -392,8 +392,41 @@ class MLService:
                 "sample_reviews": aligned_reviews
             })
             
+        # ── PHASE 23: CANONICAL CATEGORY DEDUPLICATION ───────────────────────
+        # Multiple NMF components often map to the same canonical label.
+        # Group them by label and sum mentions + merge evidence (keep top reviews).
+        import ast
+        merged = {}
+        for row in results:
+            lbl = row["label"]
+            if lbl not in merged:
+                merged[lbl] = {
+                    "keywords": row["keywords"],
+                    "mentions": 0,
+                    "sample_reviews": []
+                }
+            merged[lbl]["mentions"] += row["mentions"]
+            # Keep a combined pool of best reviews (max 15 total per category)
+            existing = merged[lbl]["sample_reviews"]
+            incoming = row["sample_reviews"] if isinstance(row["sample_reviews"], list) else []
+            combined = existing + incoming
+            merged[lbl]["sample_reviews"] = combined[:15]
+
+        # Rebuild results as clean deduplicated category rows
+        deduped_results = [
+            {
+                "topic_id": lbl,
+                "keywords": data["keywords"],
+                "label": lbl,
+                "mentions": data["mentions"],
+                "sample_reviews": data["sample_reviews"]
+            }
+            for lbl, data in merged.items()
+        ]
+        # ── END PHASE 23 ────────────────────────────────────────────────────
+
         # Export core topic clusters
-        cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
+        cache_df = pd.DataFrame(deduped_results).sort_values(by="mentions", ascending=False)
         cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
         
         # Export time-series trending data (Phase 16)
