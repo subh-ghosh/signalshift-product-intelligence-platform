@@ -45,7 +45,37 @@ class AiSummaryService:
             # 3. Time Series Trending
             is_trending = False
             trend_direction = ""
+            pct = 0
+            
+            biggest_riser = None
+            biggest_faller = None
+            
             try:
+                # Calculate General Trends (Biggest Risers/Fallers across ALL issues)
+                months = sorted(list(timeseries_df['month'].unique()))
+                if len(months) >= 2:
+                    curr_month = months[-1]
+                    prev_month = months[-2]
+                    
+                    trends = []
+                    for topic in timeseries_df['issue_label'].unique():
+                        t_df = timeseries_df[timeseries_df['issue_label'] == topic]
+                        curr_val = t_df[t_df['month'] == curr_month]['mentions'].sum()
+                        prev_val = t_df[t_df['month'] == prev_month]['mentions'].sum()
+                        
+                        if prev_val > 0:
+                            change_pct = ((curr_val - prev_val) / prev_val) * 100
+                            trends.append((topic, change_pct, curr_val - prev_val))
+                            
+                    if trends:
+                        trends.sort(key=lambda x: x[1])
+                        # Lowest pct change is faller, highest is riser
+                        if trends[0][1] < 0:
+                            biggest_faller = trends[0]
+                        if trends[-1][1] > 0:
+                            biggest_riser = trends[-1]
+
+                # Check specific trend for the #1 Top Issue
                 top_issue_timeseries = timeseries_df[timeseries_df["issue_label"] == top_label].sort_values(by="month")
                 if len(top_issue_timeseries) >= 2:
                     current_month_mentions = top_issue_timeseries.iloc[-1]["mentions"]
@@ -58,8 +88,8 @@ class AiSummaryService:
                         is_trending = True
                         trend_direction = "decreasing"
                         pct = int(((prev_month_mentions - current_month_mentions) / prev_month_mentions) * 100)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Trend calculation error: {e}")
 
             # Construct Markdown Report
             report = [
@@ -69,8 +99,15 @@ class AiSummaryService:
             if is_trending:
                 report.append(f"Time-series analysis shows this issue is **{trend_direction} by {pct}%** compared to the previous reporting period.")
 
-            if top_aspect:
+            if top_aspect is not None:
                 report.append(f" The SignalShiftBERT model indicates this is primarily a **'{top_aspect['aspect']}'** related breakdown.")
+
+            if biggest_riser or biggest_faller:
+                report.append("\n\n**Market Shift (General Trends):** ")
+                if biggest_riser:
+                    report.append(f"The fastest growing complaint is **{biggest_riser[0]}**, which spiked by **{int(biggest_riser[1])}%** (+{biggest_riser[2]} mentions) this month. ")
+                if biggest_faller:
+                    report.append(f"Conversely, we saw a massive improvement in **{biggest_faller[0]}**, which dropped by **{abs(int(biggest_faller[1]))}%**.")
 
             report.append("\n\n**Primary Evidence:** ")
             report.append(f"\n> *\"{evidence[:150]}...\"*")

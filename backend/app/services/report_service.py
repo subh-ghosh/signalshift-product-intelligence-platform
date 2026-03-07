@@ -9,6 +9,14 @@ class ReportService:
         self.output_dir = "data/reports"
         os.makedirs(self.output_dir, exist_ok=True)
 
+    def safe_text(self, text: str) -> str:
+        if not text: return ""
+        text = str(text)
+        # Replace common smart quotes with standard ones
+        text = text.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
+        # Drop unsupported Unicode characters safely to prevent FPDF crash
+        return text.encode('latin-1', 'ignore').decode('latin-1')
+
     def generate_pdf_report(self):
         try:
             # Load Data
@@ -79,13 +87,16 @@ class ReportService:
                 
                 evidence = (matching_reviews[0][:150] + "...") if matching_reviews else "No precise evidence available."
                 
+                safe_label = self.safe_text(label)
+                safe_evidence = self.safe_text(evidence)
+                
                 pdf.set_font("Helvetica", "B", 11)
                 pdf.set_text_color(229, 9, 20)
-                pdf.cell(0, 8, f"Issue #{idx+1}: {label}", ln=True)
+                pdf.cell(0, 8, f"Issue #{idx+1}: {safe_label}", ln=True)
                 
                 pdf.set_text_color(80, 80, 80)
                 pdf.set_font("Helvetica", "I", 9)
-                pdf.multi_cell(0, 6, f"Evidence: \"{evidence}\"")
+                pdf.multi_cell(0, 6, f"Evidence: \"{safe_evidence}\"")
                 
                 pdf.set_text_color(0, 0, 0)
                 pdf.set_font("Helvetica", "", 10)

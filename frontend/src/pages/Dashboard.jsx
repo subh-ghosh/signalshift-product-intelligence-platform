@@ -6,7 +6,7 @@ import TopIssuesChart from "../components/TopIssuesChart"
 import AspectRadarChart from "../components/AspectRadarChart"
 import TrendingChart from "../components/TrendingChart"
 import AiSummaryCard from "../components/AiSummaryCard"
-import { highlightEntities } from "../utils/highlight_utils"
+import { highlightEntities } from "../utils/highlight_utils.jsx"
 
 export default function Dashboard() {
 

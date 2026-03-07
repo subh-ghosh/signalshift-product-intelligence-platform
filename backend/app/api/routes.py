@@ -235,11 +235,13 @@ def issue_reviews(issue: str):
                 break
         return {
             "issue": issue,
+            "keywords": keywords if 'keywords' in locals() else "",
             "reviews": matching_reviews[:20]
         }
     except FileNotFoundError:
         return {
             "issue": issue,
+            "keywords": "",
             "reviews": []
         }
 
