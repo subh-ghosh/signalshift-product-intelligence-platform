@@ -32,12 +32,25 @@ model.fit(X_vectorized, y_full)
 
 # 4. Train Optimized Topic Model (Step 3 Winner: LDA)
 print("[3/3] Training Production Topic Model (LDA)...")
-# Note: For LDA, we need to pass standard word counts, not TF-IDF
-from sklearn.feature_extraction.text import CountVectorizer
-tf_vectorizer = CountVectorizer(max_features=5000, stop_words='english')
-tf_full = tf_vectorizer.fit_transform(X_full)
-lda = LDA(n_components=10, random_state=42)
-lda.fit(tf_full)
+# FIX: Only train on NEGATIVE reviews to ensure we find "Issues" not general talk
+negative_text = df[df["score"] <= 2]["cleaned_content"].astype(str)
+
+# CUSTOM STOPWORDS to clean up the clusters
+CUSTOM_STOPWORDS = [
+    'app', 'netflix', 'good', 'great', 'nice', 'ok', 'excellent', 'awesome', 
+    'amazing', 'super', 'useful', 'best', 'worst', 'better', 'quality', 'hai', 
+    'hua', 'hi', 'bhai', 'yaar', 'kya', 'ko', 'ki', 'he', 'it', 'very', 'is', 
+    'really', 'love', 'like', 'work', 'working', 'use', 'using', 'application'
+]
+from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS
+all_stops = list(ENGLISH_STOP_WORDS) + CUSTOM_STOPWORDS
+
+tf_vectorizer = CountVectorizer(max_features=5000, stop_words=all_stops)
+tf_negative = tf_vectorizer.fit_transform(negative_text)
+
+# Increase granularity slightly
+lda = LDA(n_components=12, random_state=42)
+lda.fit(tf_negative)
 
 # 5. Save Final Artifacts
 print("\n[S] Saving production models to /models directory...")

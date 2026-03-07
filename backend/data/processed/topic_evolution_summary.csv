@@ -1,0 +1,5 @@
+Metric,OLD Strategy,NEW Strategy
+Dataset Size,10000,2528
+Noise Ratio,18.0%,0.0%
+Primary Focus,General Talk,Customer Friction
+Actionability,Low (Generic Labels),High (Technical Labels)

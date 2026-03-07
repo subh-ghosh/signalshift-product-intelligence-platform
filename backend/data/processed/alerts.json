@@ -1,0 +1,21 @@
+{
+    "alerts": [
+        {
+            "id": "alert_1772909561_Content/Library",
+            "type": "aspect_spike",
+            "category": "Content/Library",
+            "message": "Critical spike detected in Content/Library (28.9% of complaints).",
+            "severity": "high",
+            "timestamp": "2026-03-08T00:22:41.638219"
+        },
+        {
+            "id": "alert_1772909561_General",
+            "type": "aspect_spike",
+            "category": "General",
+            "message": "Critical spike detected in General (37.3% of complaints).",
+            "severity": "high",
+            "timestamp": "2026-03-08T00:22:41.638396"
+        }
+    ],
+    "last_check": "2026-03-08T00:22:41.638516"
+}

@@ -160,6 +160,15 @@ async def get_alerts():
     """Returns any active threshold alerts."""
     return {"alerts": alerting_service.get_active_alerts()}
 
+@router.get("/dashboard/topic-benchmark")
+def get_topic_benchmark():
+    """Returns the qualitative shift in intelligence after our core model upgrade."""
+    try:
+        df = pd.read_csv("data/processed/topic_evolution_summary.csv")
+        return df.to_dict(orient="records")
+    except FileNotFoundError:
+        return []
+
 @router.get("/dashboard/export-pdf")
 async def export_report():
     """Generates and returns a branded PDF executive report."""

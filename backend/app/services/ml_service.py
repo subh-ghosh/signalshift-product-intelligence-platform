@@ -283,8 +283,16 @@ class MLService:
                         }
                         
                     topic_stats[t_id]["mentions"] += 1
-                    if len(topic_stats[t_id]["sample_reviews"]) < 20: 
-                        topic_stats[t_id]["sample_reviews"].append(batch_reviews[j])
+                    
+                    # NECESSARY COMMENTS FILTER (Phase 11)
+                    # We only add reviews that are descriptive ( > 40 chars )
+                    # to ensure the "Evidence" section is high-signal.
+                    review_text = str(batch_reviews[j])
+                    if len(review_text) > 40 and len(topic_stats[t_id]["sample_reviews"]) < 15:
+                        # Simple redundancy check: don't add if first 20 chars are similar
+                        is_redundant = any(r[:20] == review_text[:20] for r in topic_stats[t_id]["sample_reviews"])
+                        if not is_redundant:
+                            topic_stats[t_id]["sample_reviews"].append(review_text)
             except Exception as e:
                 print(f"Error processing topic batch {i}: {e}")
             

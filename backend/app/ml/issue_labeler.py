@@ -1,21 +1,32 @@
 def generate_issue_label(keywords: str) -> str:
     """
-    Auto-generates a clean dashboard title based directly on the raw cluster keywords.
-    This approach is 100% dynamic and auto-generates the title without using any 
-    hardcoded candidate lists or external APIs.
+    Auto-generates a clean dashboard title by filtering out generic noise 
+    and selecting the most descriptive technical/business terms.
     """
     if not isinstance(keywords, str) or not keywords.strip():
-        return "Unknown Issue"
+        return "General Platform Feedback"
 
-    # The keywords come in as a comma-separated string: "video, playback, buffer"
-    words = [w.strip() for w in keywords.split(",")]
+    # Keywords from LDA come in as "word1, word2, word3"
+    words = [w.strip().lower() for w in keywords.split(",")]
     
-    # We take the top 2 most mathematically important keywords from the cluster
-    if len(words) >= 2:
-        # Example: "video", "playback" -> "Video Playback Issues"
-        return f"{words[0].capitalize()} {words[1].capitalize()} Issues"
-    elif len(words) == 1:
-        # Example: "video" -> "Video Issues"
-        return f"{words[0].capitalize()} Issues"
-    else:
-        return "General Platform Complaints"
+    # Noise words that clutter titles but add no value
+    STOP_LABELS = {
+        "app", "netflix", "good", "bad", "great", "excellent", "nice", "ok", "awesome", 
+        "hai", "hua", "hi", "bhai", "yaar", "kya", "ko", "ki", "he", "it", "very", "is",
+        "application", "working", "work", "use", "using", "like", "love", "really",
+        "amazing", "super", "useful", "best", "worst", "better", "quality", "time", "hai"
+    }
+    
+    # Filter the keywords
+    filtered = [w for w in words if w not in STOP_LABELS]
+    
+    if len(filtered) >= 2:
+        # Example: "buffering", "login" -> "Buffering & Login Issues"
+        return f"{filtered[0].capitalize()} & {filtered[1].capitalize()} Issues"
+    elif len(filtered) == 1:
+        # Example: "payment" -> "Payment Related Issues"
+        return f"{filtered[0].capitalize()} Related Issues"
+    
+    # Absolute fallback using original words if everything was filtered
+    primary = words[0].capitalize() if words else "System"
+    return f"{primary} Performance Feedback"

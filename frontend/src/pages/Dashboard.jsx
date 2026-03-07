@@ -4,6 +4,7 @@ import api from "../services/api"
 import SentimentChart from "../components/SentimentChart"
 import TopIssuesChart from "../components/TopIssuesChart"
 import AspectRadarChart from "../components/AspectRadarChart"
+import ResearchBenchmark from "../components/ResearchBenchmark"
 
 export default function Dashboard() {
 
@@ -225,6 +226,9 @@ export default function Dashboard() {
                 </button>
             </div>
 
+            {/* Research Impact Benchmark */}
+            <ResearchBenchmark />
+
             {/* Upload Section */}
             <div className="glass-card" style={{ marginBottom: '40px' }}>
                 <h2 style={{ marginTop: 0 }}>Data Acquisition</h2>
@@ -327,7 +331,10 @@ export default function Dashboard() {
 
             {reviews.length > 0 && (
                 <div className="glass-card">
-                    <h2 style={{ marginTop: 0 }}>Evidence: {issue}</h2>
+                    <h2 style={{ marginTop: 0 }}>High-Signal Evidence: {issue}</h2>
+                    <p style={{ fontSize: '13px', color: '#888', marginBottom: '15px' }}>
+                        Curated feedback filtered for detail, uniqueness, and business impact.
+                    </p>
                     <div style={{
                         maxHeight: "400px",
                         overflowY: "auto",
