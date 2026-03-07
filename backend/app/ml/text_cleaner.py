@@ -1,8 +1,8 @@
 import re
 import spacy
 
-# Load spaCy model once
-nlp = spacy.load("en_core_web_sm")
+# Load spaCy model once, aggressively disabling heavy pipelines for speed
+nlp = spacy.load("en_core_web_sm", disable=["ner", "parser", "textcat", "custom"])
 
 
 def clean_text(text) -> str:

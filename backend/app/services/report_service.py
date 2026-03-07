@@ -59,20 +59,38 @@ class ReportService:
             
             # Topic Intelligence
             pdf.set_font("Helvetica", "B", 16)
-            pdf.cell(0, 10, "2. High-Priority Issue Clusters (LDA)", ln=True)
+            pdf.cell(0, 10, "2. High-Priority Issue Clusters (NMF / SignalShiftBERT)", ln=True)
             pdf.set_font("Helvetica", "", 11)
-            pdf.multi_cell(0, 7, "The top 5 recurring themes requiring immediate engineering or customer success attention:")
+            pdf.multi_cell(0, 7, "The top 5 recurring themes requiring immediate engineering or customer success attention, powered by precision topic modeling:")
             pdf.ln(5)
             
             # Top 5 Topics
+            from app.ml.issue_labeler import generate_issue_label
+            import ast
+            
             for idx, row in topic_df.head(5).iterrows():
+                label = generate_issue_label(str(row['keywords']))
+                
+                try:
+                    matching_reviews = ast.literal_eval(row["sample_reviews"])
+                except Exception:
+                    rev_string = str(row["sample_reviews"]).strip('[]')
+                    matching_reviews = [r.strip(" '\"") for r in rev_string.split("', '")]
+                
+                evidence = (matching_reviews[0][:150] + "...") if matching_reviews else "No precise evidence available."
+                
                 pdf.set_font("Helvetica", "B", 11)
                 pdf.set_text_color(229, 9, 20)
-                pdf.cell(0, 8, f"Issue #{idx+1}: {row['keywords'][:60]}...", ln=True)
+                pdf.cell(0, 8, f"Issue #{idx+1}: {label}", ln=True)
+                
+                pdf.set_text_color(80, 80, 80)
+                pdf.set_font("Helvetica", "I", 9)
+                pdf.multi_cell(0, 6, f"Evidence: \"{evidence}\"")
+                
                 pdf.set_text_color(0, 0, 0)
                 pdf.set_font("Helvetica", "", 10)
-                pdf.cell(0, 8, f"Prevalence: {row['mentions']} active mentions", ln=True)
-                pdf.ln(2)
+                pdf.cell(0, 8, f"Business Impact: {row['mentions']} active mentions", ln=True)
+                pdf.ln(3)
 
             # Footer
             pdf.set_y(-30)

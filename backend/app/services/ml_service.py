@@ -264,6 +264,9 @@ class MLService:
         total_valid = len(reviews)
         print(f"[Phase 14] Filtered out {filtered_out} low-quality/spam reviews. Kept {total_valid}.")
         
+        # Update progress tracker to reflect the filtered total for accurate ETA
+        self.progress["total"] = total_valid
+        
         if total_valid == 0:
             pd.DataFrame(columns=['topic_id', 'keywords', 'mentions', 'sample_reviews']).to_csv("data/processed/topic_analysis.csv", index=False)
             self.progress["status"] = "idle"
@@ -281,12 +284,18 @@ class MLService:
                 
             try:
                 batch_reviews = reviews[i:i + batch_size]
+                # print(f"DEBUG: Batch {i} size: {len(batch_reviews)}")
+                
                 cleaned_batch = [clean_text(r) for r in batch_reviews]
+                # print(f"DEBUG: Batch {i} cleaned")
                 
                 # Vector-based Topic Discovery (NMF)
                 # This gives us a score for how well a review fits each topic
                 X_batch_nmf = self.nmf_vectorizer.transform(batch_reviews)
+                print(f"DEBUG: Batch {i} vectorized. Shape: {X_batch_nmf.shape}")
+                
                 W_batch = self.nmf_model.transform(X_batch_nmf)
+                print(f"DEBUG: Batch {i} transformed by NMF. Shape: {W_batch.shape}")
 
                 for j in range(len(batch_reviews)):
                     # Get the most relevant topic ID
