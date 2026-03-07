@@ -302,6 +302,27 @@ class MLService:
         taxonomy_matrix = il_module._taxonomy_embeddings  # (n_cats, 384)
         taxonomy_labels = il_module._taxonomy_labels       # list[str]
         CONFIDENCE_THRESHOLD = 0.30  # Reviews below this → General App Feedback
+
+        # ── PHASE 26: SEVERITY SCORING LEXICONS ─────────────────────────────
+        SEVERITY_5_WORDS = {"scam", "fraud", "lawsuit", "legal", "stolen", "robbed", "cheat", "criminal", "hack", "hacked"}
+        SEVERITY_4_WORDS = {"terrible", "horrible", "worst", "useless", "disgusting", "outraged", "furious", "demand", "refund", "charged", "unauthorized"}
+        SEVERITY_3_WORDS = {"broken", "crash", "fail", "error", "bug", "fix", "annoying", "hate", "bad", "poor", "slow", "stuck"}
+
+        def compute_severity(text: str) -> float:
+            """Returns a severity score 1.0-5.0 based on text signals."""
+            t = text.lower()
+            words = set(t.split())
+            score = 2.0  # default baseline for a negative review
+            # Lexicon signals
+            if words & SEVERITY_5_WORDS: score += 2.5
+            elif words & SEVERITY_4_WORDS: score += 1.5
+            elif words & SEVERITY_3_WORDS: score += 0.5
+            # Capitalization rage signal
+            caps_ratio = sum(1 for c in text if c.isupper()) / max(len(text), 1)
+            if caps_ratio > 0.3: score += 0.5
+            # Exclamation intensity
+            score += min(text.count("!") * 0.2, 0.6)
+            return min(round(score, 2), 5.0)
         # ─────────────────────────────────────────────────────────────────────
 
         batch_size = 64  # Smaller batches: SBERT encode per batch
@@ -346,12 +367,26 @@ class MLService:
                         topic_stats[canonical_label] = {
                             "keywords": canonical_label,
                             "mentions": 0,
+                            "severity_total": 0.0,   # Phase 26
+                            "severity_count": 0,      # Phase 26
                             "monthly_mentions": {},
-                            "monthly_texts": {},    # Phase 25.2: texts per month for drift
-                            "sample_reviews_heap": []  # (confidence, text)
+                            "monthly_texts": {},
+                            "low_conf_reviews": [],   # Phase 27: bucket for anomaly detection
+                            "sample_reviews_heap": []
                         }
 
                     topic_stats[canonical_label]["mentions"] += 1
+
+                    # Phase 26: Accumulate severity score
+                    sev = compute_severity(batch_reviews[j])
+                    topic_stats[canonical_label]["severity_total"] += sev
+                    topic_stats[canonical_label]["severity_count"] += 1
+
+                    # Phase 27: Collect low-confidence reviews for anomaly detection
+                    if confidence < CONFIDENCE_THRESHOLD and len(
+                        topic_stats[canonical_label]["low_conf_reviews"]
+                    ) < 200:
+                        topic_stats[canonical_label]["low_conf_reviews"].append(batch_reviews[j])
 
                     # Track timeseries (Phase 16) — keyed by canonical label
                     month_str = batch_dates[j]
@@ -391,12 +426,18 @@ class MLService:
         for canonical_label, data in topic_stats.items():
             candidates = [r[1] for r in data["sample_reviews_heap"]]
 
+            # Phase 26: Compute avg severity for this category
+            avg_severity = round(
+                data["severity_total"] / max(data["severity_count"], 1), 2
+            )
+
             if not candidates:
                 results.append({
                     "topic_id": canonical_label,
                     "keywords": canonical_label,
                     "label": canonical_label,
                     "mentions": data["mentions"],
+                    "avg_severity": avg_severity,
                     "sample_reviews": []
                 })
                 continue
@@ -431,12 +472,68 @@ class MLService:
                 "keywords": canonical_label,
                 "label": canonical_label,
                 "mentions": data["mentions"],
+                "avg_severity": avg_severity,
                 "sample_reviews": final_reviews
             })
 
         # Export core topic clusters — already canonical, no Phase 23 merge needed
         cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
         cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
+
+        # ── PHASE 27: ANOMALY / EMERGING ISSUE DETECTION ─────────────────────
+        # Reviews that scored below the confidence threshold are in the
+        # "General App Feedback" bucket. We cluster those with NMF on embeddings
+        # to discover potential new issue types not in our taxonomy.
+        print("[Phase 27] Scanning for emerging issues in low-confidence reviews...")
+        try:
+            all_low_conf = []
+            for data in topic_stats.values():
+                all_low_conf.extend(data.get("low_conf_reviews", []))
+
+            MIN_EMERGING = 20  # Need at least 20 reviews to surface an emerging issue
+            if len(all_low_conf) >= MIN_EMERGING:
+                from sklearn.decomposition import NMF as _NMF
+                lc_embs = self.encoder.encode(
+                    all_low_conf, normalize_embeddings=True, show_progress_bar=False
+                )
+                # NMF on embedding space (RELU-shift for non-negativity)
+                X_lc = lc_embs - lc_embs.min()
+                n_clusters = min(8, len(all_low_conf) // 10)
+                if n_clusters >= 2:
+                    nmf_emerge = _NMF(n_components=n_clusters, random_state=42, init="nndsvd", max_iter=300)
+                    W_lc = nmf_emerge.fit_transform(X_lc)
+
+                    emerging_rows = []
+                    for t_idx in range(n_clusters):
+                        scores = W_lc[:, t_idx]
+                        top_ids = np.argsort(scores)[-5:][::-1]
+                        cluster_size = int(np.sum(scores > 0.05))
+                        if cluster_size < MIN_EMERGING:
+                            continue
+                        top_revs = [str(all_low_conf[i])[:120] for i in top_ids]
+                        emerging_rows.append({
+                            "cluster_id": t_idx,
+                            "estimated_volume": cluster_size,
+                            "is_flagged": cluster_size >= 40,
+                            "sample_review_1": top_revs[0] if len(top_revs) > 0 else "",
+                            "sample_review_2": top_revs[1] if len(top_revs) > 1 else "",
+                            "sample_review_3": top_revs[2] if len(top_revs) > 2 else "",
+                        })
+
+                    if emerging_rows:
+                        em_df = pd.DataFrame(emerging_rows).sort_values("estimated_volume", ascending=False)
+                        em_df.to_csv("data/processed/emerging_issues.csv", index=False)
+                        flagged = sum(1 for r in emerging_rows if r["is_flagged"])
+                        print(f"[Phase 27] {len(emerging_rows)} potential emerging issues found, {flagged} flagged (volume ≥ 40).")
+                    else:
+                        print("[Phase 27] No significant emerging issue clusters found.")
+                else:
+                    print(f"[Phase 27] Not enough low-confidence reviews for clustering ({len(all_low_conf)} total).")
+            else:
+                print(f"[Phase 27] Low-confidence pool too small ({len(all_low_conf)} reviews). Need {MIN_EMERGING}+.")
+        except Exception as e:
+            print(f"[Phase 27] Anomaly detection failed: {e}")
+        # ─────────────────────────────────────────────────────────────────────
 
         # ── PHASE 25.1: SILHOUETTE SCORE QUALITY BENCHMARKING ────────────────
         # Measures how well-separated the semantic clusters are.
