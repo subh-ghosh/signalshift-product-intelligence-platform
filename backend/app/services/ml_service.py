@@ -287,146 +287,147 @@ class MLService:
         topic_stats = {}
         aspect_stats = {aspect: 0 for aspect in self.aspect_config.keys()}
         aspect_stats["General"] = 0
-        
-        batch_size = 512 # LDA is much faster than BERT
+
+        # ── PHASE 24 SETUP: Pre-build taxonomy category embeddings ────────────
+        # We import here to reuse the singleton that's already cached
+        from app.ml.issue_labeler import (
+            _build_taxonomy_embeddings, _taxonomy_embeddings, _taxonomy_labels,
+            ISSUE_TAXONOMY, _encoder as _il_encoder
+        )
+        import app.ml.issue_labeler as il_module
+        # Inject the already-loaded encoder so we don't load it twice
+        il_module._encoder = self.encoder
+        _build_taxonomy_embeddings()
+        # Pull the computed centroids into local vars for speed
+        taxonomy_matrix = il_module._taxonomy_embeddings  # (n_cats, 384)
+        taxonomy_labels = il_module._taxonomy_labels       # list[str]
+        CONFIDENCE_THRESHOLD = 0.30  # Reviews below this → General App Feedback
+        # ─────────────────────────────────────────────────────────────────────
+
+        batch_size = 64  # Smaller batches: SBERT encode per batch
         for i in range(0, total_valid, batch_size):
             if self.should_stop:
                 print(f"Topic analysis stopped at {i} reviews.")
                 break
-                
+
             try:
                 batch_reviews = reviews[i:i + batch_size]
                 batch_dates = dates[i:i + batch_size]
-                
-                cleaned_batch = [clean_text(r) for r in batch_reviews]
-                
-                # Vector-based Topic Discovery (NMF)
-                # This gives us a score for how well a review fits each topic
+
+                # ── NMF: kept for ASPECT detection only ───────────────────────
                 X_batch_nmf = self.nmf_vectorizer.transform(batch_reviews)
-                print(f"DEBUG: Batch {i} vectorized. Shape: {X_batch_nmf.shape}")
-                
                 W_batch = self.nmf_model.transform(X_batch_nmf)
-                print(f"DEBUG: Batch {i} transformed by NMF. Shape: {W_batch.shape}")
+
+                # ── PHASE 24.1: Direct Per-Review Semantic Classification ──────
+                # Encode all reviews in batch at once (vectorized for speed)
+                review_embeddings = self.encoder.encode(
+                    batch_reviews, batch_size=64, normalize_embeddings=True, show_progress_bar=False
+                )
+                # (batch, 384) @ (384, n_cats) → (batch, n_cats)
+                sim_matrix = np.dot(review_embeddings, taxonomy_matrix.T)
+                best_cat_ids = np.argmax(sim_matrix, axis=1)
+                best_scores  = sim_matrix[np.arange(len(batch_reviews)), best_cat_ids]
 
                 for j in range(len(batch_reviews)):
-                    # Get the most relevant topic ID
-                    dist = W_batch[j]
-                    if np.max(dist) < 0.05:  # Dynamic Threshold (Phase 14.2): Only accept confident matches
-                        continue
-                        
-                    t_id = int(np.argmax(dist))
-                    semantic_score = dist[t_id]
-                    keywords = self.topic_keywords[t_id]
-                    
-                    # Track Aspects for ABSA
+                    # ── PHASE 24.3: Confidence Threshold Routing ──────────────
+                    confidence = float(best_scores[j])
+                    canonical_label = (
+                        taxonomy_labels[best_cat_ids[j]]
+                        if confidence >= CONFIDENCE_THRESHOLD
+                        else "General App Feedback"
+                    )
+
+                    # Track Aspects for ABSA using NMF signal
                     aspects = self.analyze_aspects(batch_reviews[j])
                     for aspect in aspects:
                         aspect_stats[aspect] += 1
 
-                    if t_id not in topic_stats:
-                        topic_stats[t_id] = {
-                            "keywords": keywords,
+                    if canonical_label not in topic_stats:
+                        topic_stats[canonical_label] = {
+                            "keywords": canonical_label,
                             "mentions": 0,
                             "monthly_mentions": {},
-                            "sample_reviews_heap": [] # (score, text)
+                            "sample_reviews_heap": []  # (confidence, text)
                         }
-                        
-                    topic_stats[t_id]["mentions"] += 1
-                    
-                    # Track timeseries (Phase 16)
+
+                    topic_stats[canonical_label]["mentions"] += 1
+
+                    # Track timeseries (Phase 16) — keyed by canonical label
                     month_str = batch_dates[j]
                     if month_str != "NaT":
-                        topic_stats[t_id]["monthly_mentions"][month_str] = topic_stats[t_id]["monthly_mentions"].get(month_str, 0) + 1
-                    
-                    # SEMANTIC EVIDENCE SELECTOR (Phase 12)
-                    # We keep only the top 15 reviews with the highest semantic scores
+                        topic_stats[canonical_label]["monthly_mentions"][month_str] = (
+                            topic_stats[canonical_label]["monthly_mentions"].get(month_str, 0) + 1
+                        )
+
+                    # Evidence collection — keep top reviews by confidence score
                     review_text = str(batch_reviews[j])
                     if len(review_text) > 40:
-                        # Use a min-heap to keep the top 15 results
-                        if len(topic_stats[t_id]["sample_reviews_heap"]) < 15:
-                            heapq.heappush(topic_stats[t_id]["sample_reviews_heap"], (semantic_score, review_text))
-                        elif semantic_score > topic_stats[t_id]["sample_reviews_heap"][0][0]:
-                            heapq.heapreplace(topic_stats[t_id]["sample_reviews_heap"], (semantic_score, review_text))
+                        heap = topic_stats[canonical_label]["sample_reviews_heap"]
+                        if len(heap) < 20:
+                            heapq.heappush(heap, (confidence, review_text))
+                        elif confidence > heap[0][0]:
+                            heapq.heapreplace(heap, (confidence, review_text))
 
             except Exception as e:
                 print(f"Error processing topic batch {i}: {e}")
-            
+
             # Update progress
-            self.progress["processed"] = min(total_valid, (i + batch_size))
+            self.progress["processed"] = min(total_valid, i + batch_size)
             self.progress["status"] = f"Analyzing topics... {self.progress['processed']}/{total_valid}"
 
-        # SEMANTIC RERANKING STAGE (Phase 13)
-        # We now have the mathematical top candidates. 
-        # We will use SentenceBERT to align them with human-readable labels.
+        # ── PHASE 24.2: EVIDENCE RE-RANKING + NEAR-DUPLICATE DEDUPLICATION ──────
+        # topic_stats is already keyed by canonical label — no merging needed.
+        # For each category: re-rank by label alignment, then deduplicate.
+        print("[Phase 24] Running evidence deduplication and re-ranking...")
         results = []
-        for t_id, data in topic_stats.items():
-            label = generate_issue_label(data["keywords"], encoder=self.encoder)
+        for canonical_label, data in topic_stats.items():
             candidates = [r[1] for r in data["sample_reviews_heap"]]
-            
+
             if not candidates:
                 results.append({
-                    "topic_id": t_id,
-                    "keywords": data["keywords"],
-                    "label": label,
+                    "topic_id": canonical_label,
+                    "keywords": canonical_label,
+                    "label": canonical_label,
                     "mentions": data["mentions"],
                     "sample_reviews": []
                 })
                 continue
 
-            # Calculate similarity between the Label and the candidate Reviews
-            label_embedding = self.encoder.encode([label])
-            review_embeddings = self.encoder.encode(candidates)
-            
-            # Simple Cosine Similarity (Dot product for normalized vectors)
-            similarities = np.dot(review_embeddings, label_embedding.T).flatten()
-            
-            # Pair reviews with their alignment score and sort
-            reranked = sorted(zip(similarities, candidates), key=lambda x: x[0], reverse=True)
-            aligned_reviews = [r[1] for r in reranked[:15]] # Top 15 best aligned
+            # Re-rank candidates against the canonical label for best alignment
+            label_emb = self.encoder.encode([canonical_label], normalize_embeddings=True)
+            cand_embs = self.encoder.encode(candidates, normalize_embeddings=True)
+            sims      = np.dot(cand_embs, label_emb.T).flatten()
+            ranked    = sorted(zip(sims, candidates), key=lambda x: x[0], reverse=True)
+
+            # ── PHASE 24.2: Near-Duplicate Deduplication ────────────────────
+            # Remove reviews that are too semantically similar to each other.
+            DEDUP_THRESHOLD = 0.85
+            kept_embs = []
+            final_reviews = []
+            for score, text in ranked:
+                if len(final_reviews) >= 15:
+                    break
+                if kept_embs:
+                    # Compute similarity of this review to all already-kept reviews
+                    candidate_emb = cand_embs[candidates.index(text)]
+                    kept_matrix   = np.array(kept_embs)
+                    max_sim       = float(np.max(np.dot(kept_matrix, candidate_emb)))
+                    if max_sim >= DEDUP_THRESHOLD:
+                        continue  # Skip near-duplicate
+                kept_embs.append(cand_embs[candidates.index(text)])
+                final_reviews.append(text)
+            # ────────────────────────────────────────────────────────────────
 
             results.append({
-                "topic_id": t_id,
-                "keywords": data["keywords"],
-                "label": label,
+                "topic_id": canonical_label,
+                "keywords": canonical_label,
+                "label": canonical_label,
                 "mentions": data["mentions"],
-                "sample_reviews": aligned_reviews
+                "sample_reviews": final_reviews
             })
-            
-        # ── PHASE 23: CANONICAL CATEGORY DEDUPLICATION ───────────────────────
-        # Multiple NMF components often map to the same canonical label.
-        # Group them by label and sum mentions + merge evidence (keep top reviews).
-        import ast
-        merged = {}
-        for row in results:
-            lbl = row["label"]
-            if lbl not in merged:
-                merged[lbl] = {
-                    "keywords": row["keywords"],
-                    "mentions": 0,
-                    "sample_reviews": []
-                }
-            merged[lbl]["mentions"] += row["mentions"]
-            # Keep a combined pool of best reviews (max 15 total per category)
-            existing = merged[lbl]["sample_reviews"]
-            incoming = row["sample_reviews"] if isinstance(row["sample_reviews"], list) else []
-            combined = existing + incoming
-            merged[lbl]["sample_reviews"] = combined[:15]
 
-        # Rebuild results as clean deduplicated category rows
-        deduped_results = [
-            {
-                "topic_id": lbl,
-                "keywords": data["keywords"],
-                "label": lbl,
-                "mentions": data["mentions"],
-                "sample_reviews": data["sample_reviews"]
-            }
-            for lbl, data in merged.items()
-        ]
-        # ── END PHASE 23 ────────────────────────────────────────────────────
-
-        # Export core topic clusters
-        cache_df = pd.DataFrame(deduped_results).sort_values(by="mentions", ascending=False)
+        # Export core topic clusters — already canonical, no Phase 23 merge needed
+        cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
         cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
         
         # Export time-series trending data (Phase 16)
