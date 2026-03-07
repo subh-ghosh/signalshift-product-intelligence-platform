@@ -347,6 +347,7 @@ class MLService:
                             "keywords": canonical_label,
                             "mentions": 0,
                             "monthly_mentions": {},
+                            "monthly_texts": {},    # Phase 25.2: texts per month for drift
                             "sample_reviews_heap": []  # (confidence, text)
                         }
 
@@ -358,6 +359,13 @@ class MLService:
                         topic_stats[canonical_label]["monthly_mentions"][month_str] = (
                             topic_stats[canonical_label]["monthly_mentions"].get(month_str, 0) + 1
                         )
+                        # Phase 25.2: Track review text per month for drift detection
+                        if month_str not in topic_stats[canonical_label]["monthly_texts"]:
+                            topic_stats[canonical_label]["monthly_texts"][month_str] = []
+                        if len(topic_stats[canonical_label]["monthly_texts"][month_str]) < 30:
+                            topic_stats[canonical_label]["monthly_texts"][month_str].append(
+                                str(batch_reviews[j])
+                            )
 
                     # Evidence collection — keep top reviews by confidence score
                     review_text = str(batch_reviews[j])
@@ -429,6 +437,99 @@ class MLService:
         # Export core topic clusters — already canonical, no Phase 23 merge needed
         cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
         cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
+
+        # ── PHASE 25.1: SILHOUETTE SCORE QUALITY BENCHMARKING ────────────────
+        # Measures how well-separated the semantic clusters are.
+        # A score near 1.0 = perfect separation; near 0 = overlapping clusters.
+        print("[Phase 25.1] Computing silhouette score for classification quality...")
+        try:
+            from sklearn.metrics import silhouette_score
+            sample_embs = []
+            sample_labels = []
+            SAMPLE_PER_CAT = 50  # Cap per category to avoid memory issues
+
+            for cat_label, data in topic_stats.items():
+                review_texts = [r[1] for r in data["sample_reviews_heap"][:SAMPLE_PER_CAT]]
+                if len(review_texts) < 2:
+                    continue
+                embs = self.encoder.encode(review_texts, normalize_embeddings=True, show_progress_bar=False)
+                sample_embs.append(embs)
+                sample_labels.extend([cat_label] * len(review_texts))
+
+            if len(set(sample_labels)) >= 2:
+                all_embs = np.vstack(sample_embs)
+                # Convert string labels to int indices for sklearn
+                unique_labels = list(set(sample_labels))
+                label_ids = [unique_labels.index(l) for l in sample_labels]
+                sil_score = float(silhouette_score(all_embs, label_ids, metric="cosine"))
+                quality_df = pd.DataFrame([{
+                    "metric": "silhouette_score",
+                    "value": round(sil_score, 4),
+                    "n_categories": len(unique_labels),
+                    "n_samples": len(sample_labels),
+                    "threshold_confidence": 0.30,
+                    "dedup_threshold": 0.85
+                }])
+                quality_df.to_csv("data/processed/classification_quality.csv", index=False)
+                print(f"[Phase 25.1] Silhouette Score: {sil_score:.4f} across {len(unique_labels)} categories")
+            else:
+                print("[Phase 25.1] Not enough categories for silhouette scoring.")
+        except Exception as e:
+            print(f"[Phase 25.1] Silhouette scoring failed: {e}")
+        # ─────────────────────────────────────────────────────────────────────
+
+        # ── PHASE 25.2: TEMPORAL SEMANTIC DRIFT DETECTION ─────────────────────
+        # For each category, compute monthly embedding centroids.
+        # Categories where consecutive month centroids diverge significantly
+        # are flagged as "semantically evolving" — the issue is changing in nature.
+        print("[Phase 25.2] Computing temporal semantic drift per category...")
+        drift_rows = []
+        try:
+            for cat_label, data in topic_stats.items():
+                monthly_texts = data.get("monthly_texts", {})
+                sorted_months = sorted(monthly_texts.keys())
+                if len(sorted_months) < 2:
+                    continue
+
+                # Compute centroid embedding per month
+                monthly_centroids = {}
+                for month in sorted_months:
+                    texts = monthly_texts[month]
+                    if not texts:
+                        continue
+                    embs = self.encoder.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+                    centroid = np.mean(embs, axis=0)
+                    centroid /= (np.linalg.norm(centroid) + 1e-8)
+                    monthly_centroids[month] = centroid
+
+                months_with_centroids = sorted(monthly_centroids.keys())
+                for k in range(1, len(months_with_centroids)):
+                    prev_m = months_with_centroids[k - 1]
+                    curr_m = months_with_centroids[k]
+                    cosine_sim = float(np.dot(monthly_centroids[prev_m], monthly_centroids[curr_m]))
+                    drift = round(1.0 - cosine_sim, 4)  # 0 = stable, 1 = max drift
+                    drift_rows.append({
+                        "category": cat_label,
+                        "month_from": prev_m,
+                        "month_to": curr_m,
+                        "drift_score": drift,
+                        "cosine_similarity": round(cosine_sim, 4),
+                        "is_evolving": drift > 0.15  # Flag as evolving if drift > threshold
+                    })
+
+            if drift_rows:
+                drift_df = pd.DataFrame(drift_rows).sort_values(
+                    by=["category", "month_from"]
+                )
+                drift_df.to_csv("data/processed/semantic_drift.csv", index=False)
+                # Log the top drifting categories for visibility
+                top_drifters = drift_df.groupby("category")["drift_score"].mean().sort_values(ascending=False).head(3)
+                print(f"[Phase 25.2] Top drifting categories: {top_drifters.to_dict()}")
+            else:
+                print("[Phase 25.2] Not enough temporal data for drift analysis.")
+        except Exception as e:
+            print(f"[Phase 25.2] Drift detection failed: {e}")
+        # ─────────────────────────────────────────────────────────────────────
         
         # Export time-series trending data (Phase 16)
         timeseries_data = []
