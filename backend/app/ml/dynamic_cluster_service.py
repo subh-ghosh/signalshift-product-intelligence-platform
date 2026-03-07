@@ -41,18 +41,49 @@ class DynamicClusteringService:
             calculate_probabilities=False
         )
 
-    def extract_dynamic_topics(self, reviews: list[str]):
+    def extract_dynamic_topics(self, reviews: list[str], progress_dict=None):
         """
         Runs the full BERTopic pipeline strictly on the provided list of text.
         Returns the processed topic cache mapped out.
         """
+        import time
         if len(reviews) < 50:
             print("[Warning] Dataset too small for reliable HDBSCAN density clustering.")
             return []
 
         print(f"-> Extracting dense embeddings for {len(reviews)} reviews...")
-        # Fit topic model dynamically on the specific dataset
-        topics, _ = self.topic_model.fit_transform(reviews)
+        
+        # 1. Manually encode so we can stream progress to the UI!
+        embeddings = []
+        batch_size = 500
+        total = len(reviews)
+        start_time = time.time()
+        
+        for i in range(0, total, batch_size):
+            batch = reviews[i:i + batch_size]
+            batch_emb = self.embedding_model.encode(batch, show_progress_bar=False)
+            embeddings.extend(batch_emb)
+            
+            if progress_dict is not None:
+                processed = min(i + batch_size, total)
+                elapsed = time.time() - start_time
+                speed = processed / elapsed if elapsed > 0 else 0
+                eta = int((total - processed) / speed) if speed > 0 else 0
+                
+                progress_dict["processed"] = processed
+                progress_dict["total"] = total
+                progress_dict["status"] = f"Translating semantics (Embeddings)... {processed}/{total}"
+                progress_dict["eta_seconds"] = eta
+                
+        # 2. Fit topic model geometrically
+        if progress_dict is not None:
+            progress_dict["processed"] = total
+            progress_dict["status"] = "Clustering geometry (UMAP & HDBSCAN)... this takes 1-2 minutes"
+            progress_dict["eta_seconds"] = 0
+            
+        import numpy as np
+        embeddings = np.array(embeddings)
+        topics, _ = self.topic_model.fit_transform(reviews, embeddings=embeddings)
 
         # Build Hierarchical topics
         # We can dynamically roll up clusters

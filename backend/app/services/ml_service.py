@@ -225,8 +225,9 @@ class MLService:
             negative_df = df.copy()
             
         total_negative = len(negative_df)
-        self.progress["total"] = total_negative
-        self.progress["processed"] = 0
+        
+        # We NO LONGER reset total/processed here, to keep the master 
+        # UI progress bar completely stable at 100% (e.g. 17,969 total)
         self.progress["start_time"] = time.time()
             
         if total_negative == 0:
@@ -257,18 +258,30 @@ class MLService:
             for aspect in aspects:
                 aspect_stats[aspect] += 1
                 
-        # Update progress before the heavily intensive task
-        self.progress["processed"] = total_valid
-        self.progress["status"] = f"Clustering geometry (HDBSCAN)... {self.progress['processed']}/{total_valid}"
+        # PHASE 15: CPU Performance Downsampling
+        import random
+        if len(reviews) > 15000:
+            print(f"[Phase 15] Downsampling from {len(reviews)} to 15,000 to drastically speed up CPU Embedding...")
+            sample_reviews = random.sample(reviews, 15000)
+            multiplier = len(reviews) / 15000
+        else:
+            sample_reviews = reviews
+            multiplier = 1.0
 
-        # PHASE 15: Single Call Semantic Density Extraction
-        # This replaces the NMF loop, the Cosine Reranker, and dynamically sets the topic count!
-        results = self.dynamic_cluster_service.extract_dynamic_topics(reviews)
+        # Single Call Semantic Density Extraction
+        # It now streams embedding progress directly to the UI dynamically!
+        results = self.dynamic_cluster_service.extract_dynamic_topics(sample_reviews, self.progress)
         
-        # Add human readable labels matching the platform API format
+        # Ensure progress finishes visually when complete
+        self.progress["processed"] = self.progress.get("total", total_valid)
+        self.progress["eta_seconds"] = 0 
+        self.progress["status"] = "Generating Dashboard Assets..."
+
+        # Add human readable labels and linearly scale mentions back up to true volume
         final_results = []
         for r in results:
             r["label"] = generate_issue_label(r["keywords"])
+            r["mentions"] = int(r["mentions"] * multiplier) # Scale up to represent true 147k volume
             final_results.append(r)
             
         cache_df = pd.DataFrame(final_results).sort_values(by="mentions", ascending=False)
