@@ -3,11 +3,13 @@ import pickle
 import time
 import os
 import numpy as np
+import heapq
 
 from sentence_transformers import SentenceTransformer
 
 from app.ml.text_cleaner import clean_text
 from .alerting_service import AlertingService
+from app.ml.issue_labeler import generate_issue_label
 
 
 class MLService:
@@ -26,15 +28,15 @@ class MLService:
         # tfidf vectorizer v2
         self.vectorizer = joblib.load(os.path.join(MODEL_DIR, "tfidf_vectorizer_v2.joblib"))
 
-        print("Loading topic model (LDA)...")
+        print("Loading topic model (NMF Precision Upgrade)...")
 
-        self.lda_model = joblib.load(os.path.join(MODEL_DIR, "lda_model.joblib"))
-        self.count_vectorizer = joblib.load(os.path.join(MODEL_DIR, "count_vectorizer.joblib"))
+        self.nmf_model = joblib.load(os.path.join(MODEL_DIR, "nmf_model.joblib"))
+        self.nmf_vectorizer = joblib.load(os.path.join(MODEL_DIR, "nmf_vectorizer.joblib"))
 
-        # Pre-extract keywords for each LDA topic for fast lookup
+        # Pre-extract keywords for each NMF topic
         self.topic_keywords = []
-        feature_names = self.count_vectorizer.get_feature_names_out()
-        for topic_idx, topic in enumerate(self.lda_model.components_):
+        feature_names = self.nmf_vectorizer.get_feature_names_out()
+        for topic_idx, topic in enumerate(self.nmf_model.components_):
             top_words = [feature_names[i] for i in topic.argsort()[:-6:-1]]
             self.topic_keywords.append(", ".join(top_words))
         
@@ -261,13 +263,19 @@ class MLService:
                 batch_reviews = reviews[i:i + batch_size]
                 cleaned_batch = [clean_text(r) for r in batch_reviews]
                 
-                # Transform whole batch via LDA
-                counts = self.count_vectorizer.transform(cleaned_batch)
-                topic_dist = self.lda_model.transform(counts)
-                
-                # Assign topics and aspects
-                for j, dist in enumerate(topic_dist):
+                # Vector-based Topic Discovery (NMF)
+                # This gives us a score for how well a review fits each topic
+                X_batch_nmf = self.nmf_vectorizer.transform(batch_reviews)
+                W_batch = self.nmf_model.transform(X_batch_nmf)
+
+                for j in range(len(batch_reviews)):
+                    # Get the most relevant topic ID
+                    dist = W_batch[j]
+                    if np.max(dist) < 0.001:  # Skip reviews that don't match any topic
+                        continue
+                        
                     t_id = int(np.argmax(dist))
+                    semantic_score = dist[t_id]
                     keywords = self.topic_keywords[t_id]
                     
                     # Track Aspects for ABSA
@@ -279,41 +287,43 @@ class MLService:
                         topic_stats[t_id] = {
                             "keywords": keywords,
                             "mentions": 0,
-                            "sample_reviews": []
+                            "sample_reviews_heap": [] # (score, text)
                         }
                         
                     topic_stats[t_id]["mentions"] += 1
                     
-                    # NECESSARY COMMENTS FILTER (Phase 11)
-                    # We only add reviews that are descriptive ( > 40 chars )
-                    # to ensure the "Evidence" section is high-signal.
+                    # SEMANTIC EVIDENCE SELECTOR (Phase 12)
+                    # We keep only the top 15 reviews with the highest semantic scores
                     review_text = str(batch_reviews[j])
-                    if len(review_text) > 40 and len(topic_stats[t_id]["sample_reviews"]) < 15:
-                        # Simple redundancy check: don't add if first 20 chars are similar
-                        is_redundant = any(r[:20] == review_text[:20] for r in topic_stats[t_id]["sample_reviews"])
-                        if not is_redundant:
-                            topic_stats[t_id]["sample_reviews"].append(review_text)
+                    if len(review_text) > 40:
+                        # Use a min-heap to keep the top 15 results
+                        if len(topic_stats[t_id]["sample_reviews_heap"]) < 15:
+                            heapq.heappush(topic_stats[t_id]["sample_reviews_heap"], (semantic_score, review_text))
+                        elif semantic_score > topic_stats[t_id]["sample_reviews_heap"][0][0]:
+                            heapq.heapreplace(topic_stats[t_id]["sample_reviews_heap"], (semantic_score, review_text))
+
             except Exception as e:
                 print(f"Error processing topic batch {i}: {e}")
             
-            self.progress["processed"] = min(i + batch_size, total_negative)
-            self.progress["eta_seconds"] = self._update_eta(
-                self.progress["processed"], 
-                total_negative, 
-                self.progress["start_time"]
-            )
+            # Update progress
+            self.progress["processed"] = min(total, (i + 1) * batch_size)
+            self.progress["status"] = f"Analyzing topics... {self.progress['processed']}/{total}"
 
-        # Format into a dataframe
-        rows = []
+        # Post-process results: convert heaps to sorted lists and generate labels
+        results = []
         for t_id, data in topic_stats.items():
-            rows.append({
+            # Sort reviews by semantic score descending
+            sorted_reviews = [r[1] for r in sorted(data["sample_reviews_heap"], key=lambda x: x[0], reverse=True)]
+            
+            results.append({
                 "topic_id": t_id,
                 "keywords": data["keywords"],
+                "label": generate_issue_label(data["keywords"]),
                 "mentions": data["mentions"],
-                "sample_reviews": str(data["sample_reviews"]) 
+                "sample_reviews": sorted_reviews
             })
             
-        cache_df = pd.DataFrame(rows).sort_values(by="mentions", ascending=False)
+        cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
         cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
         
         # Save Aspect Stats for Dashboard Heatmap
