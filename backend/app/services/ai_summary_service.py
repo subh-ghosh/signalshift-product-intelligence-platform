@@ -93,29 +93,27 @@ class AiSummaryService:
 
             # Construct Markdown Report
             report = [
-                f"**Executive Overview:** The mathematical pipeline has identified **{top_label}** as the most critical action item this cycle, actively affecting **{top_mentions}** recorded interactions. "
+                f"- **Critical Action Item:** {top_label} ({top_mentions} mentions)"
             ]
 
             if is_trending:
-                report.append(f"Time-series analysis shows this issue is **{trend_direction} by {pct}%** compared to the previous reporting period.")
+                report.append(f"\n- **Trend:** {trend_direction.capitalize()} by {pct}% MoM")
 
             if top_aspect is not None:
-                report.append(f" The SignalShiftBERT model indicates this is primarily a **'{top_aspect['aspect']}'** related breakdown.")
+                report.append(f"\n- **Root Cause Area:** {top_aspect['aspect']} functionality")
 
-            if biggest_riser or biggest_faller:
-                report.append("\n\n**Market Shift (General Trends):** ")
-                if biggest_riser:
-                    report.append(f"The fastest growing complaint is **{biggest_riser[0]}**, which spiked by **{int(biggest_riser[1])}%** (+{biggest_riser[2]} mentions) this month. ")
-                if biggest_faller:
-                    report.append(f"Conversely, we saw a massive improvement in **{biggest_faller[0]}**, which dropped by **{abs(int(biggest_faller[1]))}%**.")
-
-            report.append("\n\n**Primary Evidence:** ")
-            report.append(f"\n> *\"{evidence[:150]}...\"*")
+            if biggest_riser:
+                report.append(f"\n- **Top Riser:** {biggest_riser[0]} spiked {int(biggest_riser[1])}% (+{biggest_riser[2]} mentions)")
+                
+            if biggest_faller:
+                report.append(f"\n- **Top Faller:** {biggest_faller[0]} dropped {abs(int(biggest_faller[1]))}%")
 
             if len(topic_df) > 1:
                 second_issue = topic_df.iloc[1]
                 second_label = generate_issue_label(str(second_issue["keywords"]))
-                report.append(f"\n\n**Secondary Watchlist:** High prevalence of **{second_label}** ({second_issue['mentions']} mentions). Engineering tracking recommended.")
+                report.append(f"\n- **Secondary Watchlist:** {second_label} ({second_issue['mentions']} mentions)")
+
+            report.append(f"\n- **Primary Evidence:**\n  > *\"{evidence[:150]}...\"*")
 
             return "".join(report)
 

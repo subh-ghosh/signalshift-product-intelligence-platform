@@ -46,6 +46,8 @@ export default function AiSummaryCard() {
                 <ReactMarkdown
                     components={{
                         p: ({node, ...props}) => <p style={{ margin: "0 0 10px 0" }} {...props} />,
+                        ul: ({node, ...props}) => <ul style={{ paddingLeft: "20px", margin: "10px 0", listStyleType: "circle" }} {...props} />,
+                        li: ({node, ...props}) => <li style={{ marginBottom: "8px" }} {...props} />,
                         strong: ({node, ...props}) => <strong style={{ color: "#E50914" }} {...props} />,
                         blockquote: ({node, ...props}) => (
                             <blockquote 
