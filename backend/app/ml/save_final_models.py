@@ -30,38 +30,14 @@ print("[2/3] Training Production Sentiment Model (Logistic Regression)...")
 model = LogisticRegression(max_iter=1000, class_weight='balanced', C=1.0)
 model.fit(X_vectorized, y_full)
 
-# 4. Train Optimized Topic Model (NMF Precision Upgrade)
-print("[3/3] Training Production Topic Model (NMF)...")
-# FIX: Filter for negative reviews to ensure "Issues" are the priority
-negative_df = df[df["score"] <= 2]
-negative_text = negative_df["cleaned_content"].astype(str)
-
-# CUSTOM STOPWORDS to clean up the clusters
-CUSTOM_STOPWORDS = [
-    'app', 'netflix', 'good', 'great', 'nice', 'ok', 'excellent', 'awesome', 
-    'amazing', 'super', 'useful', 'best', 'worst', 'better', 'quality', 'hai', 
-    'hua', 'hi', 'bhai', 'yaar', 'kya', 'ko', 'ki', 'he', 'it', 'very', 'is', 
-    'really', 'love', 'like', 'work', 'working', 'use', 'using', 'application',
-    'just', 'don', 't', 's', 'can', 've', 're', 'm'
-]
-from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
-from sklearn.decomposition import NMF
-all_stops = list(ENGLISH_STOP_WORDS) + CUSTOM_STOPWORDS
-
-# Use TF-IDF for NMF (Superior to word counts for topic coherence)
-nmf_vectorizer = TfidfVectorizer(max_features=5000, stop_words=all_stops, ngram_range=(1, 2))
-X_nmf = nmf_vectorizer.fit_transform(negative_text)
-
-# NMF is mathematically more stable for short reviews than LDA
-# Increase granularity (n=30) for maximum precision (Phase 14)
-nmf = NMF(n_components=30, random_state=42, init='nndsvd')
-nmf.fit(X_nmf)
+# 4. (Deprecated) Topic Model (NMF)
+# Phase 15: We now use BERTopic/HDBSCAN for dynamic density-based clustering.
+# State-of-the-Art models cluster on the fly based on geometry, so no static pre-training is required!
 
 # 5. Save Final Artifacts
 print("\n[S] Saving production models to /models directory...")
 joblib.dump(vectorizer, os.path.join(MODEL_DIR, "tfidf_vectorizer_v2.joblib"))
 joblib.dump(model, os.path.join(MODEL_DIR, "sentiment_model_v2.joblib"))
-joblib.dump(nmf, os.path.join(MODEL_DIR, "nmf_model.joblib"))
-joblib.dump(nmf_vectorizer, os.path.join(MODEL_DIR, "nmf_vectorizer.joblib"))
+print("Done. Ready for Phase 15 Dynamic Clustering Engine.")
 
 print("\nSuccess! Systems are ready for production upgrade.")
