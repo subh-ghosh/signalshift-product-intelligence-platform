@@ -4,6 +4,9 @@ import api from "../services/api"
 import SentimentChart from "../components/SentimentChart"
 import TopIssuesChart from "../components/TopIssuesChart"
 import AspectRadarChart from "../components/AspectRadarChart"
+import TrendingChart from "../components/TrendingChart"
+import AiSummaryCard from "../components/AiSummaryCard"
+import { highlightEntities } from "../utils/highlight_utils"
 
 export default function Dashboard() {
 
@@ -11,6 +14,7 @@ export default function Dashboard() {
     const [status, setStatus] = useState("")
     const [reviews, setReviews] = useState([])
     const [issue, setIssue] = useState("")
+    const [issueKeywords, setIssueKeywords] = useState("")
     const [uploadLoading, setUploadLoading] = useState(false)
     const [chartsLoading, setChartsLoading] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
@@ -166,9 +170,11 @@ export default function Dashboard() {
                 params: { issue: keywords }
             })
             setReviews(res.data.reviews || [])
+            setIssueKeywords(res.data.keywords || "")
         } catch (err) {
             console.error(err)
             setReviews([])
+            setIssueKeywords("")
         } finally {
             setChartsLoading(false)
         }
@@ -303,6 +309,16 @@ export default function Dashboard() {
                 </div>
             )}
 
+            {/* AI Executive Summary Injection */}
+            {!uploadLoading && !chartsLoading && status.includes("complete") && (
+                <AiSummaryCard key={`ai-${refreshKey}`} />
+            )}
+
+            <div className="glass-card" style={{ marginBottom: '40px' }}>
+                <h2 style={{ marginTop: 0 }}>Trending Issues (Time-Series)</h2>
+                <TrendingChart key={`trending-${refreshKey}`} />
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '40px' }}>
                 <div className="glass-card">
                     <h2 style={{ marginTop: 0 }}>Sentiment Overview</h2>
@@ -346,7 +362,7 @@ export default function Dashboard() {
                                 fontSize: '14px',
                                 borderLeft: '3px solid #E50914'
                             }}>
-                                "{r}"
+                                "{highlightEntities(r, issueKeywords)}"
                             </div>
                         ))}
                     </div>
