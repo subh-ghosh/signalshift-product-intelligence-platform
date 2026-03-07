@@ -9,7 +9,6 @@ from sentence_transformers import SentenceTransformer
 
 from app.ml.text_cleaner import clean_text
 from app.ml.spam_filter import is_valid_review
-from app.ml.dynamic_cluster_service import DynamicClusteringService
 from .alerting_service import AlertingService
 from app.ml.issue_labeler import generate_issue_label
 
@@ -30,9 +29,17 @@ class MLService:
         # tfidf vectorizer v2
         self.vectorizer = joblib.load(os.path.join(MODEL_DIR, "tfidf_vectorizer_v2.joblib"))
 
-        print("Loading SOTA Topic Model (Dynamic Embeddings Pipeline)...")
-        # Initialize Phase 15 Dynamic HDBSCAN-based Service
-        self.dynamic_cluster_service = DynamicClusteringService()
+        print("Loading topic model (NMF Precision Upgrade)...")
+
+        self.nmf_model = joblib.load(os.path.join(MODEL_DIR, "nmf_model.joblib"))
+        self.nmf_vectorizer = joblib.load(os.path.join(MODEL_DIR, "nmf_vectorizer.joblib"))
+
+        # Pre-extract keywords for each NMF topic
+        self.topic_keywords = []
+        feature_names = self.nmf_vectorizer.get_feature_names_out()
+        for topic_idx, topic in enumerate(self.nmf_model.components_):
+            top_words = [feature_names[i] for i in topic.argsort()[:-6:-1]]
+            self.topic_keywords.append(", ".join(top_words))
         
         # Progress tracking for large uploads
         self.progress = {
@@ -54,6 +61,11 @@ class MLService:
         }
         
         self.alerting_service = AlertingService()
+        
+        print("Loading SentenceTransformer (Dynamic Alignment Engine)...")
+        # Lightweight but accurate model for semantic similarity reranking
+        # FORCING CPU to avoid CUDA capability sm_61 errors on this machine
+        self.encoder = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
         
         print("ML models loaded successfully.")
 
@@ -132,10 +144,19 @@ class MLService:
     # -------------------------
 
     def predict_topic(self, review):
-        # Deprecated for single reviews in Phase 15 (HDBSCAN requires dense groups)
+
+        cleaned = clean_text(review)
+        
+        # Use LDA instead of embeddings
+        counts = self.count_vectorizer.transform([cleaned])
+        topic_probs = self.lda_model.transform(counts)[0]
+        
+        best_index = int(np.argmax(topic_probs))
+        keywords = self.topic_keywords[best_index]
+
         return {
-            "topic_id": 0,
-            "keywords": "General Issues"
+            "topic_id": best_index,
+            "keywords": keywords
         }
 
     # -------------------------
@@ -225,9 +246,8 @@ class MLService:
             negative_df = df.copy()
             
         total_negative = len(negative_df)
-        
-        # We NO LONGER reset total/processed here, to keep the master 
-        # UI progress bar completely stable at 100% (e.g. 17,969 total)
+        self.progress["total"] = total_negative
+        self.progress["processed"] = 0
         self.progress["start_time"] = time.time()
             
         if total_negative == 0:
@@ -249,48 +269,109 @@ class MLService:
             self.progress["status"] = "idle"
             return
             
+        topic_stats = {}
         aspect_stats = {aspect: 0 for aspect in self.aspect_config.keys()}
         aspect_stats["General"] = 0
         
-        # Track Aspects independently for the Heatmap logic
-        for r in reviews:
-            aspects = self.analyze_aspects(r)
-            for aspect in aspects:
-                aspect_stats[aspect] += 1
+        batch_size = 512 # LDA is much faster than BERT
+        for i in range(0, total_valid, batch_size):
+            if self.should_stop:
+                print(f"Topic analysis stopped at {i} reviews.")
+                break
                 
-        # PHASE 15: CPU Performance Downsampling
-        import random
-        if len(reviews) > 15000:
-            print(f"[Phase 15] Downsampling from {len(reviews)} to 15,000 to drastically speed up CPU Embedding...")
-            sample_reviews = random.sample(reviews, 15000)
-            multiplier = len(reviews) / 15000
-        else:
-            sample_reviews = reviews
-            multiplier = 1.0
+            try:
+                batch_reviews = reviews[i:i + batch_size]
+                cleaned_batch = [clean_text(r) for r in batch_reviews]
+                
+                # Vector-based Topic Discovery (NMF)
+                # This gives us a score for how well a review fits each topic
+                X_batch_nmf = self.nmf_vectorizer.transform(batch_reviews)
+                W_batch = self.nmf_model.transform(X_batch_nmf)
 
-        # Single Call Semantic Density Extraction
-        # It now streams embedding progress directly to the UI dynamically!
-        results = self.dynamic_cluster_service.extract_dynamic_topics(sample_reviews, self.progress)
-        
-        # Ensure progress finishes visually when complete
-        self.progress["processed"] = self.progress.get("total", total_valid)
-        self.progress["eta_seconds"] = 0 
-        self.progress["status"] = "Generating Dashboard Assets..."
+                for j in range(len(batch_reviews)):
+                    # Get the most relevant topic ID
+                    dist = W_batch[j]
+                    if np.max(dist) < 0.05:  # Dynamic Threshold (Phase 14.2): Only accept confident matches
+                        continue
+                        
+                    t_id = int(np.argmax(dist))
+                    semantic_score = dist[t_id]
+                    keywords = self.topic_keywords[t_id]
+                    
+                    # Track Aspects for ABSA
+                    aspects = self.analyze_aspects(batch_reviews[j])
+                    for aspect in aspects:
+                        aspect_stats[aspect] += 1
 
-        # Add human readable labels and linearly scale mentions back up to true volume
-        final_results = []
-        for r in results:
-            r["label"] = generate_issue_label(r["keywords"])
-            r["mentions"] = int(r["mentions"] * multiplier) # Scale up to represent true 147k volume
-            final_results.append(r)
+                    if t_id not in topic_stats:
+                        topic_stats[t_id] = {
+                            "keywords": keywords,
+                            "mentions": 0,
+                            "sample_reviews_heap": [] # (score, text)
+                        }
+                        
+                    topic_stats[t_id]["mentions"] += 1
+                    
+                    # SEMANTIC EVIDENCE SELECTOR (Phase 12)
+                    # We keep only the top 15 reviews with the highest semantic scores
+                    review_text = str(batch_reviews[j])
+                    if len(review_text) > 40:
+                        # Use a min-heap to keep the top 15 results
+                        if len(topic_stats[t_id]["sample_reviews_heap"]) < 15:
+                            heapq.heappush(topic_stats[t_id]["sample_reviews_heap"], (semantic_score, review_text))
+                        elif semantic_score > topic_stats[t_id]["sample_reviews_heap"][0][0]:
+                            heapq.heapreplace(topic_stats[t_id]["sample_reviews_heap"], (semantic_score, review_text))
+
+            except Exception as e:
+                print(f"Error processing topic batch {i}: {e}")
             
-        cache_df = pd.DataFrame(final_results).sort_values(by="mentions", ascending=False)
+            # Update progress
+            self.progress["processed"] = min(total_valid, (i + batch_size))
+            self.progress["status"] = f"Analyzing topics... {self.progress['processed']}/{total_valid}"
+
+        # SEMANTIC RERANKING STAGE (Phase 13)
+        # We now have the mathematical top candidates. 
+        # We will use SentenceBERT to align them with human-readable labels.
+        results = []
+        for t_id, data in topic_stats.items():
+            label = generate_issue_label(data["keywords"])
+            candidates = [r[1] for r in data["sample_reviews_heap"]]
+            
+            if not candidates:
+                results.append({
+                    "topic_id": t_id,
+                    "keywords": data["keywords"],
+                    "label": label,
+                    "mentions": data["mentions"],
+                    "sample_reviews": []
+                })
+                continue
+
+            # Calculate similarity between the Label and the candidate Reviews
+            label_embedding = self.encoder.encode([label])
+            review_embeddings = self.encoder.encode(candidates)
+            
+            # Simple Cosine Similarity (Dot product for normalized vectors)
+            similarities = np.dot(review_embeddings, label_embedding.T).flatten()
+            
+            # Pair reviews with their alignment score and sort
+            reranked = sorted(zip(similarities, candidates), key=lambda x: x[0], reverse=True)
+            aligned_reviews = [r[1] for r in reranked[:15]] # Top 15 best aligned
+
+            results.append({
+                "topic_id": t_id,
+                "keywords": data["keywords"],
+                "label": label,
+                "mentions": data["mentions"],
+                "sample_reviews": aligned_reviews
+            })
+            
+        cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
         cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
         
         # Save Aspect Stats for Dashboard Heatmap
         aspect_rows = [{"aspect": k, "mentions": v} for k, v in aspect_stats.items()]
         pd.DataFrame(aspect_rows).to_csv("data/processed/aspect_analysis.csv", index=False)
-
 
         # Trigger Threshold Check
         print("[!] Checking critical thresholds...")

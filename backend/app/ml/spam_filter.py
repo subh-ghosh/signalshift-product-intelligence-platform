@@ -1,4 +1,5 @@
 import re
+from langdetect import detect, LangDetectException
 
 def is_valid_review(text: str) -> bool:
     """
@@ -10,6 +11,15 @@ def is_valid_review(text: str) -> bool:
         
     text = text.strip()
     
+    # 0. Language Barrier (Phase 14.3)
+    # Ensure only English reviews enter the model to prevent TF-IDF fracturing
+    try:
+        if detect(text) != 'en':
+            return False
+    except LangDetectException:
+        # If language detector fails (usually due to no recognizable words), drop it
+        return False
+        
     # 1. Length Heuristics
     if len(text) < 15: # Too short to establish a meaningful topic cluster
         return False

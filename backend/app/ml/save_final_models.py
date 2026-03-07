@@ -30,14 +30,55 @@ print("[2/3] Training Production Sentiment Model (Logistic Regression)...")
 model = LogisticRegression(max_iter=1000, class_weight='balanced', C=1.0)
 model.fit(X_vectorized, y_full)
 
-# 4. (Deprecated) Topic Model (NMF)
-# Phase 15: We now use BERTopic/HDBSCAN for dynamic density-based clustering.
-# State-of-the-Art models cluster on the fly based on geometry, so no static pre-training is required!
+# 4. Train Optimized Topic Model (NMF Precision Upgrade)
+print("[3/3] Training Production Topic Model (NMF)...")
+# FIX: Filter for negative reviews to ensure "Issues" are the priority
+negative_df = df[df["score"] <= 2]
+negative_text = negative_df["cleaned_content"].astype(str)
+
+# CUSTOM STOPWORDS to clean up the clusters
+CUSTOM_STOPWORDS = [
+    'app', 'netflix', 'good', 'great', 'nice', 'ok', 'excellent', 'awesome', 
+    'amazing', 'super', 'useful', 'best', 'worst', 'better', 'quality', 'hai', 
+    'hua', 'hi', 'bhai', 'yaar', 'kya', 'ko', 'ki', 'he', 'it', 'very', 'is', 
+    'really', 'love', 'like', 'work', 'working', 'use', 'using', 'application',
+    'just', 'don', 't', 's', 'can', 've', 're', 'm'
+]
+from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
+from sklearn.decomposition import NMF
+# all_stops = list(ENGLISH_STOP_WORDS) + CUSTOM_STOPWORDS # This line is removed as custom_stop_words is defined below.
+
+# 2. Extract TF-IDF features for NMF Topic Discovery
+# We only want to discover topics from NEGATIVE reviews to find ISSUES
+# Assuming 'processed_df' is 'df' and 'sentiment' can be derived from 'score'
+# and 'content' is 'cleaned_content'
+negative_text = df[df['score'] <= 2]['cleaned_content'].astype(str).str.lower()
+
+
+# True Vectorizer Stop-Words (Phase 14.1)
+# These words are now mathematically ignored by the clustering engine
+custom_stop_words = list(ENGLISH_STOP_WORDS.union({
+    "app", "netflix", "good", "bad", "great", "excellent", "nice", "ok", "awesome",
+    "hai", "hua", "hi", "bhai", "yaar", "kya", "ko", "ki", "he", "it", "very", "is",
+    "application", "working", "work", "use", "using", "like", "love", "really",
+    "amazing", "super", "useful", "best", "worst", "better", "quality", "time", "hai",
+    "just", "don", "t", "s", "can", "ve", "re", "m", "want", "let", "the", "an", "this",
+    "phone", "mobile", "update"
+}))
+
+nmf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2, stop_words=custom_stop_words)
+X_nmf = nmf_vectorizer.fit_transform(negative_text)
+
+# NMF is mathematically more stable for short reviews than LDA
+# Increase granularity (n=30) for maximum precision (Phase 14)
+nmf = NMF(n_components=30, random_state=42, init='nndsvd')
+nmf.fit(X_nmf)
 
 # 5. Save Final Artifacts
 print("\n[S] Saving production models to /models directory...")
 joblib.dump(vectorizer, os.path.join(MODEL_DIR, "tfidf_vectorizer_v2.joblib"))
 joblib.dump(model, os.path.join(MODEL_DIR, "sentiment_model_v2.joblib"))
-print("Done. Ready for Phase 15 Dynamic Clustering Engine.")
+joblib.dump(nmf, os.path.join(MODEL_DIR, "nmf_model.joblib"))
+joblib.dump(nmf_vectorizer, os.path.join(MODEL_DIR, "nmf_vectorizer.joblib"))
 
 print("\nSuccess! Systems are ready for production upgrade.")
