@@ -53,8 +53,8 @@ nmf_vectorizer = TfidfVectorizer(max_features=5000, stop_words=all_stops, ngram_
 X_nmf = nmf_vectorizer.fit_transform(negative_text)
 
 # NMF is mathematically more stable for short reviews than LDA
-# Increase granularity (n=20) for Phase 13 Semantic Alignment
-nmf = NMF(n_components=20, random_state=42, init='nndsvd')
+# Increase granularity (n=30) for maximum precision (Phase 14)
+nmf = NMF(n_components=30, random_state=42, init='nndsvd')
 nmf.fit(X_nmf)
 
 # 5. Save Final Artifacts

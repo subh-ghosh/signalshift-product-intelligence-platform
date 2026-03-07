@@ -8,6 +8,7 @@ import heapq
 from sentence_transformers import SentenceTransformer
 
 from app.ml.text_cleaner import clean_text
+from app.ml.spam_filter import is_valid_review
 from .alerting_service import AlertingService
 from app.ml.issue_labeler import generate_issue_label
 
@@ -60,6 +61,12 @@ class MLService:
         }
         
         self.alerting_service = AlertingService()
+        
+        print("Loading SentenceTransformer (Dynamic Alignment Engine)...")
+        # Lightweight but accurate model for semantic similarity reranking
+        # FORCING CPU to avoid CUDA capability sm_61 errors on this machine
+        self.encoder = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+        
         print("ML models loaded successfully.")
 
     def _update_eta(self, processed, total, start_time):
@@ -248,13 +255,26 @@ class MLService:
             self.progress["status"] = "idle"
             return
             
-        reviews = negative_df["content"].astype(str).tolist()
+        raw_reviews = negative_df["content"].astype(str).tolist()
+        
+        # PRE-PROCESSING (Phase 14): Filter out spam/junk before NLP
+        print(f"[Phase 14] Pre-processing {total_negative} negative reviews for data quality...")
+        reviews = [r for r in raw_reviews if is_valid_review(r)]
+        filtered_out = total_negative - len(reviews)
+        total_valid = len(reviews)
+        print(f"[Phase 14] Filtered out {filtered_out} low-quality/spam reviews. Kept {total_valid}.")
+        
+        if total_valid == 0:
+            pd.DataFrame(columns=['topic_id', 'keywords', 'mentions', 'sample_reviews']).to_csv("data/processed/topic_analysis.csv", index=False)
+            self.progress["status"] = "idle"
+            return
+            
         topic_stats = {}
         aspect_stats = {aspect: 0 for aspect in self.aspect_config.keys()}
         aspect_stats["General"] = 0
         
         batch_size = 512 # LDA is much faster than BERT
-        for i in range(0, total_negative, batch_size):
+        for i in range(0, total_valid, batch_size):
             if self.should_stop:
                 print(f"Topic analysis stopped at {i} reviews.")
                 break
@@ -306,21 +326,44 @@ class MLService:
                 print(f"Error processing topic batch {i}: {e}")
             
             # Update progress
-            self.progress["processed"] = min(total, (i + 1) * batch_size)
-            self.progress["status"] = f"Analyzing topics... {self.progress['processed']}/{total}"
+            self.progress["processed"] = min(total_valid, (i + batch_size))
+            self.progress["status"] = f"Analyzing topics... {self.progress['processed']}/{total_valid}"
 
-        # Post-process results: convert heaps to sorted lists and generate labels
+        # SEMANTIC RERANKING STAGE (Phase 13)
+        # We now have the mathematical top candidates. 
+        # We will use SentenceBERT to align them with human-readable labels.
         results = []
         for t_id, data in topic_stats.items():
-            # Sort reviews by semantic score descending
-            sorted_reviews = [r[1] for r in sorted(data["sample_reviews_heap"], key=lambda x: x[0], reverse=True)]
+            label = generate_issue_label(data["keywords"])
+            candidates = [r[1] for r in data["sample_reviews_heap"]]
             
+            if not candidates:
+                results.append({
+                    "topic_id": t_id,
+                    "keywords": data["keywords"],
+                    "label": label,
+                    "mentions": data["mentions"],
+                    "sample_reviews": []
+                })
+                continue
+
+            # Calculate similarity between the Label and the candidate Reviews
+            label_embedding = self.encoder.encode([label])
+            review_embeddings = self.encoder.encode(candidates)
+            
+            # Simple Cosine Similarity (Dot product for normalized vectors)
+            similarities = np.dot(review_embeddings, label_embedding.T).flatten()
+            
+            # Pair reviews with their alignment score and sort
+            reranked = sorted(zip(similarities, candidates), key=lambda x: x[0], reverse=True)
+            aligned_reviews = [r[1] for r in reranked[:15]] # Top 15 best aligned
+
             results.append({
                 "topic_id": t_id,
                 "keywords": data["keywords"],
-                "label": generate_issue_label(data["keywords"]),
+                "label": label,
                 "mentions": data["mentions"],
-                "sample_reviews": sorted_reviews
+                "sample_reviews": aligned_reviews
             })
             
         cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
@@ -335,4 +378,4 @@ class MLService:
         self.alerting_service.check_thresholds()
 
         self.progress["status"] = "complete"
-        print(f"Successfully generated and cached new topic_analysis.csv for {total_negative} reviews.")
+        print(f"Successfully generated and cached new topic_analysis.csv for {total_valid} high-quality reviews (filtered {filtered_out} spam).")
