@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import api from "../services/api"
 
 import SentimentChart from "../components/SentimentChart"
@@ -16,31 +16,36 @@ export default function Dashboard() {
     const [refreshKey, setRefreshKey] = useState(0)
     const [progress, setProgress] = useState({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
     const [syncStatus, setSyncStatus] = useState(null)
+    const [alerts, setAlerts] = useState([])
 
-    // Fetch sync status on load
-    const fetchSyncStatus = async () => {
+    // Fetch sync status and alerts on load
+    const fetchData = async () => {
         try {
-            const res = await api.get("/sync/status")
-            setSyncStatus(res.data)
+            const [syncRes, alertRes] = await Promise.all([
+                api.get("/sync/status"),
+                api.get("/dashboard/alerts")
+            ])
+            setSyncStatus(syncRes.data)
+            setAlerts(alertRes.data.alerts || [])
         } catch (e) {
-            console.error("Failed to fetch sync status", e)
+            console.error("Failed to fetch dashboard data", e)
         }
     }
 
-    // Check for active jobs on load
-    useState(() => {
+    useEffect(() => {
+        fetchData()
+        
         const checkInitialStatus = async () => {
-            fetchSyncStatus()
             try {
                 const res = await api.get("/upload-progress")
-                if (res.data.status === "sentiment" || res.data.status === "processing") {
+                if (res.data.status === "sentiment" || res.data.status === "processing" || res.data.status === "topic") {
                     setProgress(res.data)
                     setUploadLoading(true)
                     startPolling()
                 } else if (res.data.status === "complete") {
                     setUploadLoading(false)
                     setRefreshKey(prev => prev + 1)
-                    fetchSyncStatus()
+                    fetchData()
                     setStatus("Analysis complete!")
                     setTimeout(() => {
                         setProgress({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
@@ -58,7 +63,7 @@ export default function Dashboard() {
     const onAnalysisComplete = (finalStatus = "Success! Analysis complete.") => {
         setUploadLoading(false)
         setRefreshKey(prev => prev + 1)
-        fetchSyncStatus()
+        fetchData()
         setStatus(finalStatus)
         setTimeout(() => {
             setStatus("")
@@ -144,7 +149,7 @@ export default function Dashboard() {
             setStatus("Connecting to Kaggle...")
             const res = await api.post("/sync/kaggle")
             setStatus(res.data.message || "Sync started!")
-            fetchSyncStatus()
+            fetchData()
             await startPolling()
         } catch (err) {
             console.error(err)
@@ -169,17 +174,54 @@ export default function Dashboard() {
         }
     }
 
-    const generateExecutiveSummary = () => {
-        const summary = `EXECUTIVE SUMMARY: SignalShift AI has analyzed the latest review batch with 83% sensitivity. Primary churn risk identified in Performance/Technical aspects. 5 specific high-priority topics detected requiring engineering attention.`;
-        alert(summary);
+    const downloadExecutiveReport = async () => {
+        try {
+            setStatus("Generating PDF Report...")
+            const res = await api.get("/dashboard/export-pdf", { responseType: 'blob' })
+            const url = window.URL.createObjectURL(new Blob([res.data]))
+            const link = document.createElement('a')
+            link.href = url
+            link.setAttribute('download', `SignalShift_Executive_Report_${new Date().toISOString().split('T')[0]}.pdf`)
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            setStatus("Report downloaded!")
+            setTimeout(() => setStatus(""), 3000)
+        } catch (e) {
+            console.error("Failed to download PDF", e)
+            setStatus("PDF Generation failed")
+        }
     }
 
     return (
         <div style={{ padding: "40px", maxWidth: "1400px", margin: "auto" }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            
+            {/* Critical Alert Bar */}
+            {alerts.length > 0 && (
+                <div className="glass-card" style={{ 
+                    marginBottom: '20px', 
+                    borderLeft: '4px solid #E50914', 
+                    background: 'rgba(229, 9, 20, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '15px'
+                }}>
+                    <span style={{ fontSize: '24px' }}>🚨</span>
+                    <div>
+                        <h3 style={{ margin: 0, color: '#E50914', fontSize: '16px' }}>CRITICAL SYSTEM ALERT</h3>
+                        {alerts.map(a => (
+                            <p key={a.id} style={{ margin: '5px 0 0', fontSize: '14px', color: '#fff' }}>
+                                {a.message}
+                            </p>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
                 <h1>SignalShift Intelligence</h1>
-                <button className="btn-primary" onClick={generateExecutiveSummary}>
-                    📄 Generate Executive Report
+                <button className="btn-primary" onClick={downloadExecutiveReport}>
+                    📄 Export Global Report (PDF)
                 </button>
             </div>
 
@@ -215,6 +257,11 @@ export default function Dashboard() {
                     <div style={{ fontSize: "12px", color: "#666", marginTop: "15px" }}>
                         Active Database Version: <strong>{new Date(syncStatus.last_sync).toLocaleDateString()}</strong>
                     </div>
+                )}
+                {status && (
+                    <p style={{ marginTop: '10px', fontSize: '14px', color: status.includes('failed') ? '#E50914' : '#2E7D32' }}>
+                        {status}
+                    </p>
                 )}
             </div>
 

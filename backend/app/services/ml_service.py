@@ -55,8 +55,9 @@ class MLService:
             "UI/UX Experience": ["interface", "design", "navigation", "button", "screen", "search", "easy"],
             "Pricing/Subscription": ["expensive", "price", "money", "subscription", "plan", "cancel", "worth"],
         }
-
-    print("ML models loaded successfully.")
+        
+        self.alerting_service = AlertingService()
+        print("ML models loaded successfully.")
 
     def _update_eta(self, processed, total, start_time):
         """Calculates estimated seconds remaining based on processing speed"""
@@ -309,6 +310,10 @@ class MLService:
         # Save Aspect Stats for Dashboard Heatmap
         aspect_rows = [{"aspect": k, "mentions": v} for k, v in aspect_stats.items()]
         pd.DataFrame(aspect_rows).to_csv("data/processed/aspect_analysis.csv", index=False)
+
+        # Trigger Threshold Check
+        print("[!] Checking critical thresholds...")
+        self.alerting_service.check_thresholds()
 
         self.progress["status"] = "complete"
         print(f"Successfully generated and cached new topic_analysis.csv for {total_negative} reviews.")

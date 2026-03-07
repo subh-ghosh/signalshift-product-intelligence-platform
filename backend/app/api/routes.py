@@ -6,11 +6,16 @@ import os
 
 from app.services.csv_processor import process_uploaded_csv
 from app.services.data_sync_service import DataSyncService
+from app.services.report_service import ReportService
+from app.services.alerting_service import AlertingService
+from fastapi.responses import FileResponse
 
 router = APIRouter()
 
 ml_service = None
 sync_service = DataSyncService()
+report_service = ReportService()
+alerting_service = AlertingService()
 
 def set_ml_service(service):
     global ml_service
@@ -145,6 +150,28 @@ def top_aspects():
         return aspect_df.to_dict(orient="records")
     except FileNotFoundError:
         return []
+
+# -----------------------------
+# AUTOMATION & REPORTING
+# -----------------------------
+
+@router.get("/dashboard/alerts")
+async def get_alerts():
+    """Returns any active threshold alerts."""
+    return {"alerts": alerting_service.get_active_alerts()}
+
+@router.get("/dashboard/export-pdf")
+async def export_report():
+    """Generates and returns a branded PDF executive report."""
+    report_path = report_service.generate_pdf_report()
+    if not report_path or not os.path.exists(report_path):
+        return {"error": "Failed to generate report"}
+    
+    return FileResponse(
+        path=report_path,
+        filename=f"SignalShift_Executive_Report_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf",
+        media_type="application/pdf"
+    )
 
 # -----------------------------
 # REVIEWS FOR ISSUE
