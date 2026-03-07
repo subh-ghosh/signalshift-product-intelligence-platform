@@ -309,15 +309,15 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* AI Executive Summary Injection */}
-            {!uploadLoading && !chartsLoading && status.includes("complete") && (
-                <AiSummaryCard key={`ai-${refreshKey}`} />
-            )}
-
             <div className="glass-card" style={{ marginBottom: '40px' }}>
                 <h2 style={{ marginTop: 0 }}>Trending Issues (Time-Series)</h2>
                 <TrendingChart key={`trending-${refreshKey}`} />
             </div>
+
+            {/* AI Executive Summary Injection */}
+            {!uploadLoading && !chartsLoading && status.includes("complete") && (
+                <AiSummaryCard key={`ai-${refreshKey}`} />
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '40px' }}>
                 <div className="glass-card">
