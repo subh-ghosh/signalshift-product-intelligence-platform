@@ -18,52 +18,15 @@ def generate_issue_label(keywords: str) -> str:
         "just", "don", "t", "s", "can", "ve", "re", "m", "want", "let", "the", "an", "this"
     }
     
-    # ELITE SEMANTIC MAPPING (Phase 12)
-    # Map common technical words to professional business categories
-    SEMANTIC_MAP = {
-        "buffer": "Playback",
-        "playback": "Streaming",
-        "slow": "Performance",
-        "crash": "Stability",
-        "freeze": "Interface",
-        "login": "Auth/Login",
-        "account": "Profile Management",
-        "payment": "Billing",
-        "subscription": "Subscription Plan",
-        "money": "Payments",
-        "movie": "Content Library",
-        "show": "Shows",
-        "song": "Audio",
-        "music": "Music Player",
-        "download": "Offline Experience",
-        "internet": "Connectivity",
-        "wifi": "Network Stability",
-        "cancel": "Churn Risk",
-        "update": "Maintenance/Version",
-        "ad": "Ad Experience",
-        "advertisement": "Monetization Flow",
-        "message": "Communications",
-        "send": "Messaging",
-        "receive": "Incoming Alerts",
-        "notification": "Notifications"
-    }
-
     # Filter the keywords
     filtered = [w for w in words if w not in STOP_LABELS]
     
-    # Use Semantic Mapping for the labels if possible
-    final_topics = []
-    for w in filtered[:2]: # Take up to 2
-        label = SEMANTIC_MAP.get(w, w.capitalize())
-        if label not in final_topics:
-            final_topics.append(label)
-
-    if len(final_topics) >= 2:
-        # Example: "Playback" & "Stability" -> "Playback & Stability Issues"
-        return f"{final_topics[0]} & {final_topics[1]} Issues"
-    elif len(final_topics) == 1:
-        # Example: "Billing" -> "Billing Related Issues"
-        return f"{final_topics[0]} Related Issues"
+    if len(filtered) >= 2:
+        # Example: "buffering", "login" -> "Buffering & Login Issues"
+        return f"{filtered[0].capitalize()} & {filtered[1].capitalize()} Issues"
+    elif len(filtered) == 1:
+        # Example: "payment" -> "Payment Related Issues"
+        return f"{filtered[0].capitalize()} Related Issues"
     
     # Absolute fallback using original words if everything was filtered
     primary = words[0].capitalize() if words else "System"
