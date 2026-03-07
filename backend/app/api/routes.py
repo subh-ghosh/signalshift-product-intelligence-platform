@@ -162,11 +162,13 @@ async def get_alerts():
     return {"alerts": alerting_service.get_active_alerts()}
 
 @router.get("/dashboard/ai-summary")
-def get_ai_summary():
-    """Returns the generated AI Executive Summary markdown."""
+async def get_ai_summary(limit_months: int = 0):
+    """
+    Returns a dynamically generated executive summary from the ML pipeline.
+    """
     try:
-        summary_md = ai_summary_service.generate_executive_summary()
-        return {"summary": summary_md}
+        summary = ai_summary_service.generate_executive_summary(limit_months=limit_months)
+        return {"summary": summary}
     except Exception as e:
          print(f"Error serving AI Summary: {e}")
          return {"summary": "> **System Offline:** Could not fetch insights."}

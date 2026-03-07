@@ -7,7 +7,7 @@ class AiSummaryService:
     def __init__(self, data_dir="data/processed"):
         self.data_dir = data_dir
 
-    def generate_executive_summary(self) -> str:
+    def generate_executive_summary(self, limit_months=0) -> str:
         """
         Dynamically generates a human-readable executive summary markdown string
         based on the latest mathematical clusters from the ML pipeline.
@@ -18,6 +18,12 @@ class AiSummaryService:
                 topic_df = pd.read_csv(f"{self.data_dir}/topic_analysis.csv")
                 aspect_df = pd.read_csv(f"{self.data_dir}/aspect_analysis.csv")
                 timeseries_df = pd.read_csv(f"{self.data_dir}/topic_timeseries.csv")
+                
+                # Apply Dynamic Slicing
+                if limit_months > 0:
+                    all_months = sorted(timeseries_df['month'].unique())
+                    target_months = all_months[-limit_months:]
+                    timeseries_df = timeseries_df[timeseries_df['month'].isin(target_months)]
             except FileNotFoundError:
                 return "> **Status:** No data analyzed yet. Please run a dataset sync to generate insights."
 
@@ -51,11 +57,12 @@ class AiSummaryService:
             biggest_faller = None
             
             try:
-                # Calculate General Trends (Biggest Risers/Fallers across ALL issues)
+                # Calculate General Trends (Biggest Risers/Fallers across the CURRENT window)
                 months = sorted(list(timeseries_df['month'].unique()))
                 if len(months) >= 2:
                     curr_month = months[-1]
-                    prev_month = months[-2]
+                    prev_month = months[0] # Compare to start of window
+                    window_desc = f"over the last {len(months)} months" if limit_months > 0 else "this cycle"
                     
                     trends = []
                     for topic in timeseries_df['issue_label'].unique():
@@ -91,9 +98,22 @@ class AiSummaryService:
             except Exception as e:
                 print(f"Trend calculation error: {e}")
 
+            # 4. Time Range Calculation
+            time_range_str = "Recent data"
+            try:
+                all_months = sorted(list(timeseries_df['month'].unique()))
+                if all_months:
+                    start_m = all_months[0]
+                    end_m = all_months[-1]
+                    count_m = len(all_months)
+                    time_range_str = f"Analysis Period: {start_m} — {end_m} ({count_m} months total)"
+            except Exception:
+                pass
+
             # Construct Markdown Report
             report = [
-                f"- **Critical Action Item:** {top_label} ({top_mentions} mentions)"
+                f"- **{time_range_str}**",
+                f"\n- **Critical Action Item:** {top_label} ({top_mentions} mentions)"
             ]
 
             if is_trending:
@@ -103,10 +123,10 @@ class AiSummaryService:
                 report.append(f"\n- **Root Cause Area:** {top_aspect['aspect']} functionality")
 
             if biggest_riser:
-                report.append(f"\n- **Top Riser:** {biggest_riser[0]} spiked {int(biggest_riser[1])}% (+{biggest_riser[2]} mentions)")
+                report.append(f"\n- **Top Riser:** {biggest_riser[0]} spiked {int(biggest_riser[1])}% (+{biggest_riser[2]} mentions) {window_desc}")
                 
             if biggest_faller:
-                report.append(f"\n- **Top Faller:** {biggest_faller[0]} dropped {abs(int(biggest_faller[1]))}%")
+                report.append(f"\n- **Top Faller:** {biggest_faller[0]} dropped {abs(int(biggest_faller[1]))}% {window_desc}")
 
             if len(topic_df) > 1:
                 second_issue = topic_df.iloc[1]

@@ -2,17 +2,25 @@ import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import api from "../services/api";
 
-export default function AiSummaryCard() {
+export default function AiSummaryCard({ range }) {
     const [summary, setSummary] = useState("");
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchSummary();
-    }, []);
+    }, [range]);
 
     const fetchSummary = async () => {
         try {
-            const res = await api.get("/dashboard/ai-summary");
+            setLoading(true);
+            let limit = 0;
+            if (range === "3M") limit = 3;
+            else if (range === "6M") limit = 6;
+            else if (range === "12M") limit = 12;
+
+            const res = await api.get("/dashboard/ai-summary", {
+                params: { limit_months: limit }
+            });
             setSummary(res.data.summary);
         } catch (err) {
             console.error(err);

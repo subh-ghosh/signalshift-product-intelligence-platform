@@ -21,6 +21,7 @@ export default function Dashboard() {
     const [progress, setProgress] = useState({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
     const [syncStatus, setSyncStatus] = useState(null)
     const [alerts, setAlerts] = useState([])
+    const [range, setRange] = useState("ALL")
 
     // Fetch sync status and alerts on load
     const fetchData = async () => {
@@ -311,12 +312,12 @@ export default function Dashboard() {
 
             <div className="glass-card" style={{ marginBottom: '40px' }}>
                 <h2 style={{ marginTop: 0 }}>Trending Issues (Time-Series)</h2>
-                <TrendingChart key={`trending-${refreshKey}`} />
+                <TrendingChart key={`trending-${refreshKey}`} range={range} setRange={setRange} />
             </div>
 
             {/* AI Executive Summary Injection */}
-            {!uploadLoading && !chartsLoading && status.includes("complete") && (
-                <AiSummaryCard key={`ai-${refreshKey}`} />
+            {!uploadLoading && !chartsLoading && (
+                <AiSummaryCard key={`ai-${refreshKey}-${range}`} range={range} />
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '40px' }}>

@@ -360,7 +360,7 @@ class MLService:
         # We will use SentenceBERT to align them with human-readable labels.
         results = []
         for t_id, data in topic_stats.items():
-            label = generate_issue_label(data["keywords"])
+            label = generate_issue_label(data["keywords"], encoder=self.encoder)
             candidates = [r[1] for r in data["sample_reviews_heap"]]
             
             if not candidates:
@@ -399,7 +399,7 @@ class MLService:
         # Export time-series trending data (Phase 16)
         timeseries_data = []
         for t_id, data in topic_stats.items():
-            label = generate_issue_label(data["keywords"])
+            label = generate_issue_label(data["keywords"], encoder=self.encoder)
             for month_str, m_count in data.get("monthly_mentions", {}).items():
                 timeseries_data.append({
                     "topic_id": t_id,
