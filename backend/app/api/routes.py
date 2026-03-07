@@ -169,6 +169,25 @@ def get_topic_benchmark():
     except FileNotFoundError:
         return []
 
+@router.get("/dashboard/trending-issues")
+def trending_issues():
+    """Serves time-series data of topic prevalence, formatted for Recharts."""
+    try:
+        df = pd.read_csv("data/processed/topic_timeseries.csv")
+        # Sort to ensure chronological order
+        df = df.sort_values(by="month")
+        
+        # Filter to the Top 5 most prevalent issues overall to avoid cluttering the graph
+        top_issues = df.groupby("issue_label")["mentions"].sum().nlargest(5).index
+        df_top = df[df["issue_label"].isin(top_issues)]
+        
+        # Pivot table: rows = month, columns = issue_label, values = mentions
+        pivot = df_top.pivot_table(index="month", columns="issue_label", values="mentions", fill_value=0).reset_index()
+        return pivot.to_dict(orient="records")
+    except Exception as e:
+        print(f"Error serving trending issues: {e}")
+        return []
+
 @router.get("/dashboard/export-pdf")
 async def export_report():
     """Generates and returns a branded PDF executive report."""

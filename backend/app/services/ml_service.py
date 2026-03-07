@@ -259,7 +259,19 @@ class MLService:
         
         # PRE-PROCESSING (Phase 14): Filter out spam/junk before NLP
         print(f"[Phase 14] Pre-processing {total_negative} negative reviews for data quality...")
-        reviews = [r for r in raw_reviews if is_valid_review(r)]
+        # Create a boolean mask for valid reviews to preserve dataframe structure
+        mask = negative_df["content"].astype(str).apply(is_valid_review)
+        valid_df = negative_df[mask].copy()
+        
+        reviews = valid_df["content"].astype(str).tolist()
+        
+        # Track dates for Phase 16 Time-Series
+        date_col = 'at' if 'at' in valid_df.columns else 'date' if 'date' in valid_df.columns else None
+        if date_col:
+            dates = pd.to_datetime(valid_df[date_col], errors="coerce").dt.to_period("M").astype(str).tolist()
+        else:
+            dates = ["Unknown"] * len(reviews)
+            
         filtered_out = total_negative - len(reviews)
         total_valid = len(reviews)
         print(f"[Phase 14] Filtered out {filtered_out} low-quality/spam reviews. Kept {total_valid}.")
@@ -284,10 +296,9 @@ class MLService:
                 
             try:
                 batch_reviews = reviews[i:i + batch_size]
-                # print(f"DEBUG: Batch {i} size: {len(batch_reviews)}")
+                batch_dates = dates[i:i + batch_size]
                 
                 cleaned_batch = [clean_text(r) for r in batch_reviews]
-                # print(f"DEBUG: Batch {i} cleaned")
                 
                 # Vector-based Topic Discovery (NMF)
                 # This gives us a score for how well a review fits each topic
@@ -316,10 +327,16 @@ class MLService:
                         topic_stats[t_id] = {
                             "keywords": keywords,
                             "mentions": 0,
+                            "monthly_mentions": {},
                             "sample_reviews_heap": [] # (score, text)
                         }
                         
                     topic_stats[t_id]["mentions"] += 1
+                    
+                    # Track timeseries (Phase 16)
+                    month_str = batch_dates[j]
+                    if month_str != "NaT":
+                        topic_stats[t_id]["monthly_mentions"][month_str] = topic_stats[t_id]["monthly_mentions"].get(month_str, 0) + 1
                     
                     # SEMANTIC EVIDENCE SELECTOR (Phase 12)
                     # We keep only the top 15 reviews with the highest semantic scores
@@ -375,8 +392,24 @@ class MLService:
                 "sample_reviews": aligned_reviews
             })
             
+        # Export core topic clusters
         cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
         cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
+        
+        # Export time-series trending data (Phase 16)
+        timeseries_data = []
+        for t_id, data in topic_stats.items():
+            label = generate_issue_label(data["keywords"])
+            for month_str, m_count in data.get("monthly_mentions", {}).items():
+                timeseries_data.append({
+                    "topic_id": t_id,
+                    "issue_label": label,
+                    "month": month_str,
+                    "mentions": m_count
+                })
+        
+        if timeseries_data:
+            pd.DataFrame(timeseries_data).to_csv("data/processed/topic_timeseries.csv", index=False)
         
         # Save Aspect Stats for Dashboard Heatmap
         aspect_rows = [{"aspect": k, "mentions": v} for k, v in aspect_stats.items()]

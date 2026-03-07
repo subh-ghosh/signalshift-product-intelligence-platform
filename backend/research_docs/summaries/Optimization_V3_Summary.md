@@ -16,10 +16,11 @@ Detailed results can be found in [Topic_Benchmark_Final.md](file:///media/subh/S
 | **Primary Focus** | General Platform Feedback | Specific Customer Friction |
 | **Actionability** | Low (Generic Dashboard Labels) | High (Professional Semantic Mapping) |
 
-## 3. Semantic Evidence & Scoring
-We replaced simple length-filtering with **Vector-based Semantic Scoring**:
-- **Selection**: Every review is given a topic-relevance score. Only the top-ranked reviews are selected for the dashboard.
-- **Professional Mapping**: Raw keywords are mapped to industry terms like "Auth/Login", "Churn Risk", and "Offline Experience".
+## 3. Transparency & Raw Keyword Alignment
+We prioritized **Transparency** over hardcoded categories:
+- **Labeling**: We removed the human-authored "Business Mapping" to ensure that the dashboard labels are a 1:1 reflection of the underlying NMF clusters.
+- **Format**: Labels follow the `[Keyword 1] & [Keyword 2] Issues` format, providing a direct, non-abstracted view of customer feedback.
+- **Selection**: "High-Signal" evidence is selected using mathematical vector-relevance scores, ensuring 100% alignment between the keywords and the comments.
 
 ---
 *SignalShift Elite V4 - Precision Intelligence Architecture.*
