@@ -4,7 +4,6 @@ import api from "../services/api"
 import SentimentChart from "../components/SentimentChart"
 import TopIssuesChart from "../components/TopIssuesChart"
 import AspectRadarChart from "../components/AspectRadarChart"
-import ResearchBenchmark from "../components/ResearchBenchmark"
 
 export default function Dashboard() {
 
@@ -225,9 +224,6 @@ export default function Dashboard() {
                     📄 Export Global Report (PDF)
                 </button>
             </div>
-
-            {/* Research Impact Benchmark */}
-            <ResearchBenchmark />
 
             {/* Upload Section */}
             <div className="glass-card" style={{ marginBottom: '40px' }}>
