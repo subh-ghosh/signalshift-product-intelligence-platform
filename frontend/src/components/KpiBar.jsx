@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
+import { SkeletonKpiBar } from "./Skeleton"
 
 // Delta badge: shows +12% ↑ or -5% ↓
 function DeltaBadge({ delta, isPercent = true }) {
@@ -58,7 +59,8 @@ export default function KpiBar({ limitMonths = 0 }) {
             .finally(() => setLoading(false))
     }, [limitMonths])
 
-    if (loading || !kpis) return null
+    if (loading) return <SkeletonKpiBar />
+    if (!kpis) return null
 
     const sentimentColor = kpis.positive_pct >= 60 ? "#1DB954" : kpis.positive_pct >= 40 ? "#FFB347" : "#E50914"
     const ratingColor = kpis.avg_rating >= 3.5 ? "#1DB954" : kpis.avg_rating >= 2.5 ? "#FFB347" : "#E50914"

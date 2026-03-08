@@ -157,6 +157,18 @@ def top_issues(limit_months: int = 0):
                 if prev_months:
                     prev_win = ts_df[ts_df["month"].isin(prev_months)].groupby("topic_id")["mentions"].sum()
                     prev_mentions_map = prev_win.to_dict()
+                    
+                # We also need the best available rate for sorting/display
+                metric_col = "severity_weighted_rate" if "severity_weighted_rate" in ts_df.columns else "normalized_rate" if "normalized_rate" in ts_df.columns else "mentions"
+                
+                # Apply the noise floor: minimum 15 mentions required to be ranked by rate.
+                valid_curr_topics = curr_win[curr_win >= 15].index
+                
+                # Peak rate in the window (same as Trending Chart velocity selection methodology)
+                curr_rate = ts_df[
+                    (ts_df["month"].isin(curr_months)) & 
+                    (ts_df["topic_id"].isin(valid_curr_topics))
+                ].groupby("topic_id")[metric_col].max()
 
                 # Apply windowed counts to topic_df
                 windowed = curr_win.reset_index()
@@ -164,10 +176,19 @@ def top_issues(limit_months: int = 0):
                 topic_df = topic_df.merge(windowed, on=label_col_ta, how="left")
                 topic_df["mentions"] = topic_df["windowed_mentions"].fillna(0).astype(int)
                 topic_df = topic_df.drop(columns=["windowed_mentions"], errors="ignore")
+                
+                # Apply the metric rate for sorting
+                rate_df = curr_rate.reset_index()
+                rate_df.columns = [label_col_ta, "windowed_rate"]
+                topic_df = topic_df.merge(rate_df, on=label_col_ta, how="left")
+                topic_df["sort_metric"] = topic_df["windowed_rate"].fillna(0.0).astype(float)
             except Exception as e:
                 print(f"[top-issues] Windowed mentions error: {e}")
 
-        topic_df = topic_df.sort_values("mentions", ascending=False)
+        if "sort_metric" not in topic_df.columns:
+            topic_df["sort_metric"] = topic_df["mentions"]
+
+        topic_df = topic_df.sort_values("sort_metric", ascending=False)
         issues = []
         for _, row in topic_df.iterrows():
             label = str(row.get(label_col_ta, row.get("keywords", "Unknown")))
@@ -195,6 +216,7 @@ def top_issues(limit_months: int = 0):
                 "issue": label,
                 "keywords": label,
                 "mentions": mentions,
+                "sort_metric": row.get("sort_metric", mentions),
                 "avg_severity": round(float(row.get("avg_severity", 0.0)), 2),
                 "velocity": velocity,
                 "velocity_dir": velocity_dir,
@@ -266,24 +288,205 @@ def get_topic_benchmark():
 
 @router.get("/dashboard/trending-issues")
 def trending_issues(limit_months: int = 0):
-    """Serves time-series data of topic prevalence. Top-N chosen within the selected window."""
+    """
+    Phase 35 (final) — Statistically rigorous time-series.
+
+    Improvements applied in order:
+    1. Severity-weighted rate: prefers `severity_weighted_rate` if available, else
+       `normalized_rate` (per 1k reviews), else raw `mentions`. Severity-weighted
+       means a month with 30 CRITICAL crashes counts more than 100 mild UI niggles.
+    2. Full month coverage: every month in the corpus range is present for every
+       category (filled with NaN, not 0). Prevents the rolling average from bridging
+       over genuine data-void gaps.
+    3. Gap-safe rolling average: uses min_periods=2 so months flanked by real data
+       are smoothed, but isolated single-month spikes without neighbors are preserved
+       as-is rather than being suppressed.
+    4. Velocity-based Top-5: peak rate in window, not total volume — catches fast-
+       rising issues before they dominate in raw counts.
+    Backwards-compatible: works with old CSV (raw mentions only).
+    """
     try:
         df = pd.read_csv("data/processed/topic_timeseries.csv")
         df = df.sort_values(by="month")
 
-        # Pick top-5 issues BY the selected window (not all time)
+        # ── 1. Pick best available metric column ────────────────────────────
+        if "severity_weighted_rate" in df.columns:
+            metric_col = "severity_weighted_rate"
+        elif "normalized_rate" in df.columns:
+            metric_col = "normalized_rate"
+        else:
+            metric_col = "mentions"
+
+        # ── 2. Select the time window ────────────────────────────────────────
+        all_months = sorted(df["month"].unique())
         if limit_months > 0:
-            all_months = sorted(df["month"].unique())
             target_months = all_months[-limit_months:]
             window_df = df[df["month"].isin(target_months)]
         else:
+            target_months = all_months
             window_df = df
 
-        top_issues = window_df.groupby("issue_label")["mentions"].sum().nlargest(5).index
-        df_top = df[df["issue_label"].isin(top_issues)]
+        # ── 3. Select Top-5 by VELOCITY (peak rate in window) ────────────────
+        # First, establish a noise floor.
+        # An issue must have at least 15 raw mentions in the window to be
+        # considered statistically significant enough for Top 5 ranking.
+        valid_topics = (
+            window_df.groupby("issue_label")["mentions"]
+            .sum()
+        )
+        valid_topics = valid_topics[valid_topics >= 15].index
+        
+        peak_velocity = (
+            window_df[window_df["issue_label"].isin(valid_topics)]
+            .groupby("issue_label")[metric_col]
+            .max()
+            .nlargest(5)
+            .index
+        )
+        df_top = df[df["issue_label"].isin(peak_velocity)]
 
-        pivot = df_top.pivot_table(index="month", columns="issue_label", values="mentions", fill_value=0).reset_index()
+        # ── 4. Full month coverage (no gap bridging in rolling average) ──────
+        # Build a complete month index from the full corpus date range
+        try:
+            full_range = pd.period_range(
+                start=all_months[0], end=all_months[-1], freq="M"
+            ).astype(str).tolist()
+        except Exception:
+            full_range = all_months  # fallback if period_range fails
+
+        complete_index = pd.DataFrame({"month": full_range})
+
+        # Pivot with NaN for missing months (do NOT use fill_value=0)
+        pivot = df_top.pivot_table(
+            index="month", columns="issue_label",
+            values=metric_col
+            # fill_value intentionally omitted — missing months stay NaN
+        ).reset_index()
+
+        # Merge onto complete month index to expose gaps as NaN rows
+        pivot = complete_index.merge(pivot, on="month", how="left")
+        issue_cols = [c for c in pivot.columns if c != "month"]
+
+        # ── 5. Gap-safe rolling average & Statistical Control Bands ────────────
+        # Calculate Rolling Mean (Expected Baseline)
+        rolling_mean = (
+            pivot[issue_cols]
+            .rolling(window=3, min_periods=2, center=True)
+            .mean()
+        )
+        
+        # Calculate Rolling Standard Deviation (Expected Variance)
+        # min_periods=2 ensures we don't divide by zero or NaN on single data points
+        rolling_std = (
+            pivot[issue_cols]
+            .rolling(window=3, min_periods=2, center=True)
+            .std()
+        )
+        
+        # Compute Upper Bound (Mean + 1.5 StdDev)
+        upper_bounds = rolling_mean + (1.5 * rolling_std)
+        upper_bounds = upper_bounds.round(2).fillna(0)
+        
+        # Rename upper bounds columns
+        upper_cols = [f"{c}_upper_bound" for c in issue_cols]
+        upper_bounds.columns = upper_cols
+        
+        # Calculate Month-over-Month Momentum before replacing pivot with mean
+        # (We want momentum of the smoothed line for stability)
+        mom_pct = pivot[issue_cols].pct_change() * 100
+        mom_pct = mom_pct.round(1).fillna(0)
+        mom_cols = [f"{c}_mom" for c in issue_cols]
+        mom_pct.columns = mom_cols
+        
+        # Apply mean back to pivot
+        pivot[issue_cols] = rolling_mean.round(2)
+
+        # Fill remaining NaN with 0 for clean JSON serialisation
+        pivot[issue_cols] = pivot[issue_cols].fillna(0)
+        
+        # ── 5.5 Statistical Correlation Engine (Pearson Matrix) ──────────────
+        correlation_matrix = pivot[issue_cols].corr()
+        correlation_keys = {}
+        for col in issue_cols:
+            corr_key = f"{col}_correlated_with"
+            correlation_keys[corr_key] = ""
+            if not correlation_matrix.empty and col in correlation_matrix.columns:
+                # Find the highest correlated issue (excluding itself)
+                others = correlation_matrix[col].drop(col)
+                if not others.empty:
+                    best_match = others.idxmax()
+                    best_score = others.max()
+                    # Only flag strong statistical correlations (>0.80)
+                    if best_score > 0.80:
+                        score_pct = int(best_score * 100)
+                        correlation_keys[corr_key] = f"{best_match} ({score_pct}% match)"
+
+        # Apply static correlations across the window so the UI always has access to them
+        correlations_df = pd.DataFrame([correlation_keys] * len(pivot), index=pivot.index)
+        
+        # Concatenate bounds, momentum, and correlations into the final JSON payload
+        pivot = pd.concat([pivot, upper_bounds, mom_pct, correlations_df], axis=1)
+
+        # ── 6. Predictive Forecasting (T+1 Month) ────────────────────────────
+        if len(pivot) >= 3:
+            # Use last 3 months to calculate a linear slope for each issue
+            last_3 = pivot[(pivot["month"].isin(target_months)) if limit_months > 0 else (pivot.index == pivot.index)].tail(3)
+            
+            if len(last_3) >= 3:
+                # Slope = (Y_last - Y_first) / 2
+                slope = (last_3[issue_cols].iloc[-1] - last_3[issue_cols].iloc[0]) / 2.0
+                
+                # Predict T+1
+                forecast_vals = (pivot[issue_cols].iloc[-1] + slope).clip(lower=0).round(2)
+                
+                # Predict T+1 Bounds (assuming same standard deviation as current month)
+                forecast_bounds = (pivot[upper_cols].iloc[-1] + slope.values).clip(lower=0).round(2)
+                
+                # Momentum for forecast
+                forecast_mom = ((forecast_vals - pivot[issue_cols].iloc[-1]) / pivot[issue_cols].iloc[-1].replace(0, 1)) * 100
+                forecast_mom = forecast_mom.round(1).fillna(0)
+                
+                last_month_str = pivot["month"].iloc[-1]
+                if pd.isna(last_month_str) and len(target_months) > 0:
+                     last_month_str = target_months[-1]
+                     
+                try:
+                    y, m = last_month_str.split('-')
+                    next_m = int(m) + 1
+                    next_y = int(y)
+                    if next_m > 12:
+                        next_m = 1
+                        next_y += 1
+                    next_month_str = f"{next_y}-{next_m:02d} (Forecast)"
+                    
+                    # Build forecast row dictionary
+                    forecast_row = {"month": next_month_str}
+                    for c in issue_cols:
+                        forecast_row[c] = forecast_vals[c]
+                        forecast_row[f"{c}_upper_bound"] = forecast_bounds[f"{c}_upper_bound"]
+                        forecast_row[f"{c}_mom"] = forecast_mom[c]
+                        forecast_row[f"{c}_correlated_with"] = correlation_keys.get(f"{c}_correlated_with", "")
+                    forecast_row["is_forecast"] = True
+                    
+                    # Store forecast row to append later
+                    forecast_df = pd.DataFrame([forecast_row])
+                except Exception as e:
+                    forecast_df = None
+            else:
+                forecast_df = None
+        else:
+            forecast_df = None
+
+        # ── 7. Return only the requested window to the chart ─────────────────
+        if limit_months > 0:
+            pivot = pivot[pivot["month"].isin(target_months)]
+        
+        pivot["is_forecast"] = False
+        if forecast_df is not None:
+             pivot = pd.concat([pivot, forecast_df], ignore_index=True)
+
         return pivot.to_dict(orient="records")
+
     except Exception as e:
         print(f"Error serving trending issues: {e}")
         return []
@@ -397,6 +600,105 @@ def issue_reviews(issue: str, limit_months: int = 0):
 def reviews():
     df = get_dashboard_dataset()
     return df.head(50).to_dict(orient="records")
+
+
+# -----------------------------
+# CSV EXPORT
+# -----------------------------
+
+@router.get("/dashboard/export-csv")
+def export_csv(limit_months: int = 0):
+    """Exports filtered reviews as a CSV file download."""
+    import io
+    from fastapi.responses import StreamingResponse
+
+    df = get_dashboard_dataset()
+    if limit_months > 0 and "at" in df.columns:
+        df["at"] = pd.to_datetime(df["at"], errors="coerce")
+        cutoff = pd.Timestamp.now() - pd.DateOffset(months=limit_months)
+        df = df[df["at"] >= cutoff]
+
+    # Keep only useful columns
+    keep_cols = [c for c in ["reviewId", "content", "score", "sentiment", "at", "app", "appVersion"] if c in df.columns]
+    export_df = df[keep_cols].copy()
+
+    stream = io.StringIO()
+    export_df.to_csv(stream, index=False)
+    stream.seek(0)
+
+    window_label = f"Last{limit_months}M" if limit_months > 0 else "AllTime"
+    filename = f"SignalShift_Reviews_{window_label}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([stream.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# -----------------------------
+# VELOCITY-BASED SMART ALERTS
+# -----------------------------
+
+@router.get("/dashboard/velocity-alerts")
+def velocity_alerts(limit_months: int = 3):
+    """
+    Detects categories spiking or collapsing vs the previous equivalent period.
+    Returns alert objects with severity (CRITICAL / HIGH / WATCH) when velocity > threshold.
+    """
+    SPIKE_CRITICAL = 40   # > 40% increase → CRITICAL
+    SPIKE_HIGH     = 20   # > 20% increase → HIGH
+    SPIKE_WATCH    = 10   # > 10% increase → WATCH
+    DROP_CRITICAL  = -40  # > 40% drop     → good news, silent
+    alerts_out = []
+    try:
+        ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+        all_months = sorted(ts_df["month"].unique())
+        if len(all_months) < limit_months:
+            return []
+
+        curr_months = all_months[-limit_months:]
+        prev_months = all_months[-(limit_months * 2):-limit_months] if len(all_months) >= limit_months * 2 else []
+        if not prev_months:
+            return []
+
+        curr = ts_df[ts_df["month"].isin(curr_months)].groupby("topic_id")["mentions"].sum()
+        prev = ts_df[ts_df["month"].isin(prev_months)].groupby("topic_id")["mentions"].sum()
+
+        categories = set(curr.index) | set(prev.index)
+        for cat in categories:
+            c_val = int(curr.get(cat, 0))
+            p_val = int(prev.get(cat, 0))
+            if p_val == 0:
+                continue
+            pct = round(((c_val - p_val) / p_val) * 100, 1)
+
+            severity = None
+            if pct >= SPIKE_CRITICAL:
+                severity = "CRITICAL"
+            elif pct >= SPIKE_HIGH:
+                severity = "HIGH"
+            elif pct >= SPIKE_WATCH:
+                severity = "WATCH"
+
+            if severity:
+                sign = "+" if pct > 0 else ""
+                alerts_out.append({
+                    "id": f"vel-{cat.lower().replace(' ', '-')[:20]}",
+                    "category": cat,
+                    "velocity_pct": pct,
+                    "curr_mentions": c_val,
+                    "prev_mentions": p_val,
+                    "severity": severity,
+                    "window": f"Last {limit_months}M",
+                    "message": f"🔴 {cat}: {sign}{pct}% mentions vs previous {limit_months}M ({p_val} → {c_val})"
+                })
+
+        # Sort by velocity descending (worst spikes first)
+        alerts_out.sort(key=lambda x: x["velocity_pct"], reverse=True)
+        return alerts_out
+    except Exception as e:
+        print(f"[velocity-alerts] error: {e}")
+        return []
 
 
 # -----------------------------

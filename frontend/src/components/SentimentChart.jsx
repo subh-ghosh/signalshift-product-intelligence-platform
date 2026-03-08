@@ -1,6 +1,7 @@
-import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts"
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts"
 import { useEffect, useState } from "react"
 import api from "../services/api"
+import { SkeletonChart } from "./Skeleton"
 
 const COLORS = ["#1DB954", "#E50914"]
 
@@ -17,11 +18,11 @@ export default function SentimentChart({ limitMonths = 0 }) {
           { name: "Negative", value: res.data.negative }
         ])
       })
-      .catch(() => {})
+      .catch(() => setData([]))
       .finally(() => setLoading(false))
   }, [limitMonths])
 
-  if (loading) return <p style={{ color: "#888" }}>Loading sentiment...</p>
+  if (loading) return <SkeletonChart height={300} />
 
   const total = data.reduce((s, d) => s + d.value, 0)
 

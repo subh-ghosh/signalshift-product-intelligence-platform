@@ -13,8 +13,12 @@ class ReportService:
     def safe_text(self, text: str) -> str:
         if not text: return ""
         text = str(text)
+        # Map common high-unicode to ASCII/Latin-1
         text = text.replace("\u2018", "'").replace("\u2019", "'").replace("\u201c", '"').replace("\u201d", '"')
         text = text.replace("\u2014", "--").replace("\u2013", "-").replace("\u2026", "...")
+        text = text.replace("\u2b24", "*").replace("\u26a0", "!!").replace("\u25b2", "^")
+        # Directional arrows
+        text = text.replace("\u2191", "^").replace("\u2193", "v")
         return text.encode('latin-1', 'ignore').decode('latin-1')
 
     def generate_pdf_report(self, limit_months: int = 0):
@@ -74,6 +78,64 @@ class ReportService:
             pdf.set_font("Helvetica", "", 12)
             pdf.cell(0, 10, f"Executive Report  |  {window_label}  |  {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align='C')
             pdf.ln(20)
+
+            # ── KPI Summary with Period-over-Period Deltas ───────────────────
+            try:
+                reviews_df = None
+                for fname in ["uploaded_reviews.csv", "cleaned_reviews.csv"]:
+                    p = os.path.join(self.data_dir, fname)
+                    if os.path.exists(p):
+                        reviews_df = pd.read_csv(p)
+                        break
+
+                if reviews_df is not None:
+                    has_dates = limit_months > 0 and "at" in reviews_df.columns
+
+                    def _kpi(df):
+                        tot = len(df)
+                        avg_r = round(float(df["score"].mean()), 2) if "score" in df.columns and tot > 0 else None
+                        pos = int((df["sentiment"] == "positive").sum()) if "sentiment" in df.columns else 0
+                        pos_pct = round((pos / tot) * 100, 1) if tot > 0 else 0
+                        return tot, avg_r, pos_pct
+
+                    if has_dates:
+                        reviews_df["at"] = pd.to_datetime(reviews_df["at"], errors="coerce")
+                        now = pd.Timestamp.now()
+                        curr_df = reviews_df[reviews_df["at"] >= now - pd.DateOffset(months=limit_months)]
+                        prev_df = reviews_df[(reviews_df["at"] >= now - pd.DateOffset(months=limit_months * 2)) &
+                                             (reviews_df["at"] < now - pd.DateOffset(months=limit_months))]
+                    else:
+                        curr_df = reviews_df
+                        prev_df = pd.DataFrame()
+
+                    tot, avg_r, pos_pct = _kpi(curr_df)
+                    prev_tot, prev_r, prev_pos = _kpi(prev_df) if not prev_df.empty else (None, None, None)
+
+                    def _arrow(cur, prv):
+                        if prv is None or prv == 0: return ""
+                        return " ^" if cur > prv else " v" if cur < prv else " ="
+
+                    pdf.set_text_color(0, 0, 0)
+                    pdf.set_font("Helvetica", "B", 14)
+                    pdf.cell(0, 10, "Key Performance Indicators", ln=True)
+                    pdf.set_font("Helvetica", "B", 9)
+                    for col, w in [("Metric", 70), ("Value", 40), ("Prev Period", 40), ("Trend", 30)]:
+                        pdf.cell(w, 8, col, border=1)
+                    pdf.ln()
+                    pdf.set_font("Helvetica", "", 9)
+                    rows_kpi = [
+                        ("Total Reviews", f"{tot:,}", f"{prev_tot:,}" if prev_tot else "N/A", _arrow(tot, prev_tot)),
+                        ("Avg Star Rating", f"{avg_r}/5.0" if avg_r else "N/A", f"{prev_r}/5.0" if prev_r else "N/A", _arrow(avg_r, prev_r)),
+                        ("Positive Sentiment", f"{pos_pct}%", f"{prev_pos}%" if prev_pos is not None else "N/A", _arrow(pos_pct, prev_pos)),
+                    ]
+                    for label, val, pval, trend in rows_kpi:
+                        pdf.cell(70, 7, label, border=1)
+                        pdf.cell(40, 7, val, border=1)
+                        pdf.cell(40, 7, pval, border=1)
+                        pdf.cell(30, 7, trend, border=1, ln=True)
+                    pdf.ln(8)
+            except Exception as e:
+                print(f"[PDF] KPI section error: {e}")
 
             # ── Model Quality Card ───────────────────────────────────────────
             if quality_df is not None and not quality_df.empty:
@@ -141,7 +203,7 @@ class ReportService:
 
                 pdf.set_text_color(50, 50, 50)
                 pdf.set_font("Helvetica", "", 10)
-                sev_bar = "\u2b24" * min(round(avg_sev), 5)  # filled circles as severity indicator
+                sev_bar = "*" * min(round(avg_sev), 5)  # Replaced filled circle with asterisk
                 pdf.cell(0, 7, f"   Mentions: {mentions:,}   |   Avg Severity: {avg_sev:.1f}/5.0  {sev_bar}", ln=True)
 
                 pdf.set_text_color(100, 100, 100)
@@ -160,7 +222,7 @@ class ReportService:
                     pdf.add_page()
                     pdf.set_font("Helvetica", "B", 16)
                     pdf.set_text_color(229, 9, 20)
-                    pdf.cell(0, 10, "3. \u26a0  Emerging / Uncategorized Issues", ln=True)
+                    pdf.cell(0, 10, "3. [!!]  Emerging / Uncategorized Issues", ln=True)
                     pdf.set_text_color(0, 0, 0)
                     pdf.set_font("Helvetica", "", 11)
                     pdf.multi_cell(0, 7, "These clusters were detected in low-confidence reviews not covered by the current taxonomy. Review and consider adding to ISSUE_TAXONOMY.")
@@ -168,7 +230,8 @@ class ReportService:
 
                     for _, row in flagged.iterrows():
                         pdf.set_font("Helvetica", "B", 10)
-                        pdf.cell(0, 7, f"  Cluster #{int(row['cluster_id'])} — Est. Volume: {int(row['estimated_volume'])} reviews", ln=True)
+                        txt = self.safe_text(f"  Cluster #{int(row['cluster_id'])} - Est. Volume: {int(row['estimated_volume'])} reviews")
+                        pdf.cell(0, 7, txt, ln=True)
                         pdf.set_font("Helvetica", "I", 9)
                         pdf.set_text_color(80, 80, 80)
                         sample = self.safe_text(str(row.get("sample_review_1", ""))[:120])
@@ -190,8 +253,9 @@ class ReportService:
                     top_drift = evolving.groupby("category")["drift_score"].mean().sort_values(ascending=False).head(5)
                     for cat, drift_score in top_drift.items():
                         pdf.set_font("Helvetica", "", 10)
-                        bar = "\u25b2" * min(round(drift_score * 10), 5)
-                        pdf.cell(0, 7, f"  {self.safe_text(cat)}  —  avg drift {drift_score:.3f}  {bar}", ln=True)
+                        bar = "^" * min(round(drift_score * 10), 5)
+                        txt = self.safe_text(f"  {cat} - avg drift {drift_score:.3f} {bar}")
+                        pdf.cell(0, 7, txt, ln=True)
                     pdf.ln(5)
 
             # ── Footer ───────────────────────────────────────────────────────

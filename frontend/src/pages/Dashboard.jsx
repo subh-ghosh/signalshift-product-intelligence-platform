@@ -9,6 +9,7 @@ import AiSummaryCard from "../components/AiSummaryCard"
 import KpiBar from "../components/KpiBar"
 import EmergingIssuesPanel from "../components/EmergingIssuesPanel"
 import SemanticDriftPanel from "../components/SemanticDriftPanel"
+import { SkeletonKpiBar, SkeletonChart, SkeletonCard } from "../components/Skeleton"
 import { highlightEntities } from "../utils/highlight_utils.jsx"
 
 // Convert "3M" → 3, "6M" → 6, "12M" → 12, "ALL" → 0
@@ -68,8 +69,10 @@ export default function Dashboard() {
     const [progress, setProgress] = useState({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
     const [syncStatus, setSyncStatus] = useState(null)
     const [alerts, setAlerts] = useState([])
+    const [velocityAlerts, setVelocityAlerts] = useState([])
     const [reviewWindow, setReviewWindow] = useState("")
     const [totalInWindow, setTotalInWindow] = useState(0)
+    const [kpiLoading, setKpiLoading] = useState(true)
     
     // ── GLOBAL RANGE STATE ──────────────────────────────────────────
     const [range, setRange] = useState("ALL")
@@ -225,6 +228,40 @@ export default function Dashboard() {
         setIssue("")
     }, [range])
 
+    // Fetch velocity-based alerts whenever range changes
+    useEffect(() => {
+        if (limitMonths > 0) {
+            api.get("/dashboard/velocity-alerts", { params: { limit_months: limitMonths } })
+                .then(res => setVelocityAlerts(res.data || []))
+                .catch(() => setVelocityAlerts([]))
+        } else {
+            setVelocityAlerts([])
+        }
+    }, [limitMonths])
+
+    const downloadCsv = async () => {
+        try {
+            setStatus(`Exporting CSV (${range === "ALL" ? "All Time" : `Last ${range}`})...`)
+            const res = await api.get("/dashboard/export-csv", {
+                responseType: "blob",
+                params: { limit_months: limitMonths }
+            })
+            const url = window.URL.createObjectURL(new Blob([res.data]))
+            const link = document.createElement("a")
+            link.href = url
+            const windowStr = range === "ALL" ? "AllTime" : range
+            link.setAttribute("download", `SignalShift_Reviews_${windowStr}_${new Date().toISOString().split("T")[0]}.csv`)
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            setStatus("CSV downloaded!")
+            setTimeout(() => setStatus(""), 3000)
+        } catch (e) {
+            console.error("Failed to download CSV", e)
+            setStatus("CSV export failed")
+        }
+    }
+
     const downloadExecutiveReport = async () => {
         try {
             setStatus(`Generating PDF (${range === "ALL" ? "All Time" : `Last ${range}`})...`)
@@ -252,18 +289,30 @@ export default function Dashboard() {
         <div style={{ padding: "40px", maxWidth: "1400px", margin: "auto" }}>
 
             {/* Critical Alert Bar */}
-            {alerts.length > 0 && (
+            {(alerts.length > 0 || velocityAlerts.length > 0) && (
                 <div className="glass-card" style={{
                     marginBottom: "20px",
                     borderLeft: "4px solid #E50914",
-                    background: "rgba(229, 9, 20, 0.1)",
+                    background: velocityAlerts.some(a => a.severity === "CRITICAL") ? "rgba(229, 9, 20, 0.2)" : "rgba(229, 9, 20, 0.1)",
                     display: "flex", alignItems: "center", gap: "15px"
                 }}>
                     <span style={{ fontSize: "24px" }}>🚨</span>
                     <div>
-                        <h3 style={{ margin: 0, color: "#E50914", fontSize: "16px" }}>CRITICAL SYSTEM ALERT</h3>
+                        <h3 style={{ margin: 0, color: "#E50914", fontSize: "16px" }}>INTELLIGENCE ALERTS</h3>
                         {alerts.map(a => (
                             <p key={a.id} style={{ margin: "5px 0 0", fontSize: "14px", color: "#fff" }}>{a.message}</p>
+                        ))}
+                        {velocityAlerts.map(a => (
+                            <p key={a.id} style={{
+                                margin: "5px 0 0", fontSize: "14px", color: "#fff",
+                                fontWeight: a.severity === "CRITICAL" ? 700 : 400
+                            }}>
+                                <span style={{
+                                    color: a.severity === "CRITICAL" ? "#E50914" : "#FFB347",
+                                    marginRight: "8px"
+                                }}>[{a.severity}]</span>
+                                {a.message}
+                            </p>
                         ))}
                     </div>
                 </div>
@@ -282,7 +331,10 @@ export default function Dashboard() {
                 </div>
                 <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                     <TimelineSelector range={range} setRange={setRange} />
-                    <button className="btn-primary" onClick={downloadExecutiveReport}>
+                    <button className="btn-secondary" onClick={downloadCsv} style={{ height: "36px" }}>
+                        📊 CSV Export ({range})
+                    </button>
+                    <button className="btn-primary" onClick={downloadExecutiveReport} style={{ height: "36px" }}>
                         📄 Export Report ({range})
                     </button>
                 </div>

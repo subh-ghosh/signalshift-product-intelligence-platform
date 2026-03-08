@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
+import { SkeletonCard } from "./Skeleton"
 
 function DriftBar({ score }) {
     const pct = Math.min(score * 500, 100)  // 0.20 drift → 100%
@@ -27,7 +28,7 @@ export default function SemanticDriftPanel({ limitMonths = 0 }) {
             .finally(() => setLoading(false))
     }, [limitMonths])
 
-    if (loading) return <p style={{ color: "#666", fontSize: "13px" }}>Computing semantic drift...</p>
+    if (loading) return <SkeletonCard lines={5} />
     if (!data.length) return (
         <p style={{ color: "#666", fontSize: "13px" }}>
             No significant semantic drift detected in the selected window. Language is stable.

@@ -11,6 +11,7 @@ import {
 
 import { useEffect, useState } from "react"
 import api from "../services/api"
+import { SkeletonChart } from "./Skeleton"
 
 // Severity → color scale (green → amber → red)
 function severityColor(sev) {
@@ -36,7 +37,7 @@ function CustomTooltip({ active, payload }) {
     }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{d.issue}</div>
       <div style={{ color: "#aaa" }}>
-        Mentions: <span style={{ color: "#fff", fontWeight: 600 }}>{d.mentions.toLocaleString()}</span>
+        Score (Severity-Weighted): <span style={{ color: "#fff", fontWeight: 600 }}>{d.sort_metric ? d.sort_metric.toFixed(1) : d.mentions.toLocaleString()}</span>
       </div>
       {d.velocity_label && (
         <div style={{ color: velColor, fontWeight: 700, marginTop: 4, fontSize: "12px" }}>
@@ -103,7 +104,7 @@ export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
   }
 
   if (loading) {
-    return <p style={{ color: "#888" }}>Loading issues...</p>
+    return <SkeletonChart height={420} />
   }
 
   if (!data.length) {

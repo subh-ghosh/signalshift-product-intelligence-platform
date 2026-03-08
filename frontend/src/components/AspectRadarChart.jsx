@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import { SkeletonChart } from './Skeleton';
 
 export default function AspectRadarChart({ limitMonths = 0 }) {
     const [data, setData] = useState([]);
@@ -30,7 +31,7 @@ export default function AspectRadarChart({ limitMonths = 0 }) {
         fetchAspects();
     }, [limitMonths]);
 
-    if (loading) return <p style={{ textAlign: 'center', color: '#666' }}>Loading specialized aspects...</p>;
+    if (loading) return <SkeletonChart height={300} />;
     if (data.length === 0) return <p style={{ textAlign: 'center', color: '#666' }}>No aspect data available yet.</p>;
 
     return (

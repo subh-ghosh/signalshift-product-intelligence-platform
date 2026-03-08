@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
+import { SkeletonCard } from "./Skeleton"
 
 export default function EmergingIssuesPanel({ limitMonths = 0 }) {
     const [clusters, setClusters] = useState([])
@@ -14,7 +15,7 @@ export default function EmergingIssuesPanel({ limitMonths = 0 }) {
             .finally(() => setLoading(false))
     }, [limitMonths])
 
-    if (loading) return <p style={{ color: "#666", fontSize: "13px" }}>Scanning for emerging issues...</p>
+    if (loading) return <SkeletonCard lines={6} />
     if (!clusters.length) return (
         <p style={{ color: "#666", fontSize: "13px" }}>
             No flagged emerging clusters detected. Run a Kaggle sync to generate this data.

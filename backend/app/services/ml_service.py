@@ -285,11 +285,10 @@ class MLService:
             return
             
         topic_stats = {}
-        aspect_stats = {aspect: 0 for aspect in self.aspect_config.keys()}
-        aspect_stats["General"] = 0
-
-        # ── PHASE 31: Per-review classifications (for time-aware evidence) ──
-        review_classifications = []  # list of dicts: {text, category, date, severity, confidence}
+        aspect_stats = {aspect: 0 for aspect in self.aspect_config}
+        review_classifications = []  # Phase 31: per-review records with dates
+        # ── Phase 35: Track total reviews per month for rate normalization ─────
+        monthly_review_totals = {}  # { 'YYYY-MM': total_review_count }
 
         # ── PHASE 24 SETUP: Pre-build taxonomy category embeddings ────────────
         # We import here to reuse the singleton that's already cached
@@ -393,10 +392,13 @@ class MLService:
 
                     # Track timeseries (Phase 16) — keyed by canonical label
                     month_str = batch_dates[j]
-                    if month_str != "NaT":
+                    if month_str != "NaT" and month_str != "Unknown":
                         topic_stats[canonical_label]["monthly_mentions"][month_str] = (
                             topic_stats[canonical_label]["monthly_mentions"].get(month_str, 0) + 1
                         )
+                        # ── Phase 35: Track global review totals per month ─────
+                        monthly_review_totals[month_str] = monthly_review_totals.get(month_str, 0) + 1
+                        # ─────────────────────────────────────────────────────────
                         # Phase 25.2: Track review text per month for drift detection
                         if month_str not in topic_stats[canonical_label]["monthly_texts"]:
                             topic_stats[canonical_label]["monthly_texts"][month_str] = []
@@ -624,41 +626,59 @@ class MLService:
                     curr_m = months_with_centroids[k]
                     cosine_sim = float(np.dot(monthly_centroids[prev_m], monthly_centroids[curr_m]))
                     drift = round(1.0 - cosine_sim, 4)  # 0 = stable, 1 = max drift
+                    drift = round(1.0 - cosine_sim, 4)  # 0 = stable, 1 = max drift
                     drift_rows.append({
                         "category": cat_label,
                         "month_from": prev_m,
                         "month_to": curr_m,
                         "drift_score": drift,
-                        "cosine_similarity": round(cosine_sim, 4),
-                        "is_evolving": drift > 0.15  # Flag as evolving if drift > threshold
+                        "is_evolving": bool(drift > 0.15)
                     })
-
-            if drift_rows:
-                drift_df = pd.DataFrame(drift_rows).sort_values(
-                    by=["category", "month_from"]
-                )
-                drift_df.to_csv("data/processed/semantic_drift.csv", index=False)
-                # Log the top drifting categories for visibility
-                top_drifters = drift_df.groupby("category")["drift_score"].mean().sort_values(ascending=False).head(3)
-                print(f"[Phase 25.2] Top drifting categories: {top_drifters.to_dict()}")
-            else:
-                print("[Phase 25.2] Not enough temporal data for drift analysis.")
         except Exception as e:
             print(f"[Phase 25.2] Drift detection failed: {e}")
+
+        if drift_rows:
+            pd.DataFrame(drift_rows).to_csv("data/processed/semantic_drift.csv", index=False)
         # ─────────────────────────────────────────────────────────────────────
-        
-        # Export time-series trending data (Phase 16)
+
+        # ── Phase 35 (final): Export NORMALIZED + SEVERITY-WEIGHTED time-series ──
+        # Now stores three metrics per category-month:
+        #   mentions              — raw count (for auditing/fallback)
+        #   normalized_rate       — mentions per 1000 reviews that month
+        #   severity_weighted_rate — sum(severity) per 1000 reviews (best metric)
+        #   total_reviews_in_month — denominator used for both rates
         timeseries_data = []
+
+        # Build per-category monthly severity sums from review_classifications data
+        sev_by_cat_month = {}
+        for clf in review_classifications:
+            cat = clf.get("category", "")
+            month = clf.get("date", "")
+            sev = clf.get("severity", 2.0)
+            if cat and month and month not in ("NaT", "Unknown", ""):
+                key = (cat, month)
+                sev_by_cat_month[key] = sev_by_cat_month.get(key, 0.0) + sev
+
         for t_id, data in topic_stats.items():
             label = generate_issue_label(data["keywords"], encoder=self.encoder)
             for month_str, m_count in data.get("monthly_mentions", {}).items():
+                total_in_month = monthly_review_totals.get(month_str, m_count)
+                norm_rate = round((m_count / max(total_in_month, 1)) * 1000, 2)
+                # Severity-weighted: sum of severity scores / total reviews * 1000
+                sev_sum = sev_by_cat_month.get((label, month_str),
+                          sev_by_cat_month.get((t_id, month_str), m_count * 2.0))
+                sev_weighted = round((sev_sum / max(total_in_month, 1)) * 1000, 2)
                 timeseries_data.append({
                     "topic_id": t_id,
                     "issue_label": label,
                     "month": month_str,
-                    "mentions": m_count
+                    "mentions": m_count,
+                    "normalized_rate": norm_rate,
+                    "severity_weighted_rate": sev_weighted,
+                    "total_reviews_in_month": total_in_month
                 })
-        
+        # ─────────────────────────────────────────────────────────────────────
+
         if timeseries_data:
             pd.DataFrame(timeseries_data).to_csv("data/processed/topic_timeseries.csv", index=False)
         
