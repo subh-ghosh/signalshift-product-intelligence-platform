@@ -1,7 +1,5 @@
 import pandas as pd
-import json
 import ast
-from app.ml.issue_labeler import generate_issue_label
 
 class AiSummaryService:
     def __init__(self, data_dir="data/processed"):
@@ -31,17 +29,18 @@ class AiSummaryService:
                 return "> **Status:** Analysis complete, but no high-confidence issues were detected."
 
             # 1. Core Problem Framing
-            top_issue = topic_df.iloc[0]
-            top_label = generate_issue_label(str(top_issue["keywords"]))
+            top_issue   = topic_df.iloc[0]
+            # Phase 24+: label column IS the canonical category string already
+            top_label   = str(top_issue.get("label", top_issue.get("keywords", "Unknown")))
             top_mentions = top_issue["mentions"]
+            top_sev  = float(top_issue.get("avg_severity", 0.0))
             
-            # Extract evidence
             try:
                 matching_reviews = ast.literal_eval(top_issue["sample_reviews"])
             except Exception:
                 rev_string = str(top_issue["sample_reviews"]).strip('[]')
-                matching_reviews = [r.strip(" '\"") for r in rev_string.split("', '")]
-                
+                matching_reviews = [r.strip(" '\"\n") for r in rev_string.split("', '") if r.strip()]
+
             evidence = matching_reviews[0] if matching_reviews else "No clear textual evidence."
 
             # 2. Aspect Intelligence
@@ -130,9 +129,11 @@ class AiSummaryService:
 
             if len(topic_df) > 1:
                 second_issue = topic_df.iloc[1]
-                second_label = generate_issue_label(str(second_issue["keywords"]))
+                # Phase 24+: label IS canonical already
+                second_label = str(second_issue.get("label", second_issue.get("keywords", "Unknown")))
                 report.append(f"\n- **Secondary Watchlist:** {second_label} ({second_issue['mentions']} mentions)")
 
+            report.append(f"\n- **Severity Indicator:** {top_label} scores {top_sev:.1f}/5.0 avg severity")
             report.append(f"\n- **Primary Evidence:**\n  > *\"{evidence[:150]}...\"*")
 
             return "".join(report)

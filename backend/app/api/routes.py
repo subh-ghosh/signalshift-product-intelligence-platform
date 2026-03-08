@@ -121,19 +121,17 @@ def sentiment_distribution():
 
 @router.get("/dashboard/top-issues")
 def top_issues():
-    from app.ml.issue_labeler import generate_issue_label
     try:
         topic_df = pd.read_csv("data/processed/topic_analysis.csv")
         issues = []
-        top_10 = topic_df.head(10)
-        for _, row in top_10.iterrows():
-            keywords = str(row["keywords"])
-            mentions = int(row["mentions"])
-            label = generate_issue_label(keywords)
+        for _, row in topic_df.head(10).iterrows():
+            # Phase 24+: `label` column IS the canonical category name
+            label = str(row.get("label", row.get("keywords", "Unknown")))
             issues.append({
                 "issue": label,
-                "keywords": keywords,
-                "mentions": mentions
+                "keywords": label,
+                "mentions": int(row["mentions"]),
+                "avg_severity": round(float(row.get("avg_severity", 0.0)), 2)
             })
         return issues
     except FileNotFoundError:
@@ -220,32 +218,29 @@ async def export_report():
 
 @router.get("/dashboard/issue-reviews")
 def issue_reviews(issue: str):
-    from app.ml.issue_labeler import generate_issue_label
     import ast
     try:
         topic_df = pd.read_csv("data/processed/topic_analysis.csv")
         matching_reviews = []
+        matched_label = issue
         for _, row in topic_df.iterrows():
-            keywords = str(row["keywords"])
-            label = generate_issue_label(keywords)
-            if label == issue:
+            # Phase 24+: label column is already canonical
+            label = str(row.get("label", row.get("keywords", "")))
+            if label.strip() == issue.strip():
                 try:
                     matching_reviews = ast.literal_eval(row["sample_reviews"])
                 except Exception:
                     rev_string = str(row["sample_reviews"]).strip('[]')
-                    matching_reviews = [r.strip(" '\"") for r in rev_string.split("', '")]
+                    matching_reviews = [r.strip(" '\"\n") for r in rev_string.split("', '") if r.strip()]
+                matched_label = label
                 break
         return {
             "issue": issue,
-            "keywords": keywords if 'keywords' in locals() else "",
-            "reviews": matching_reviews[:20]
+            "keywords": matched_label,
+            "reviews": [r for r in matching_reviews if len(str(r)) > 20][:20]
         }
     except FileNotFoundError:
-        return {
-            "issue": issue,
-            "keywords": "",
-            "reviews": []
-        }
+        return {"issue": issue, "keywords": "", "reviews": []}
 
 # -----------------------------
 # REVIEWS LIST
