@@ -133,6 +133,14 @@ def top_issues(limit_months: int = 0):
     try:
         topic_df = pd.read_csv("data/processed/topic_analysis.csv")
 
+        # Detect the label column: Phase 24+ uses 'label', fallback to 'topic_id' or first col
+        if "label" in topic_df.columns:
+            label_col_ta = "label"
+        elif "topic_id" in topic_df.columns:
+            label_col_ta = "topic_id"
+        else:
+            label_col_ta = topic_df.columns[0]  # first column is the canonical label
+
         # When a time window is selected, recalculate mentions from timeseries
         if limit_months > 0:
             try:
@@ -140,29 +148,36 @@ def top_issues(limit_months: int = 0):
                 all_months = sorted(ts_df["month"].unique())
                 target_months = all_months[-limit_months:]
                 ts_filtered = ts_df[ts_df["month"].isin(target_months)]
-                # topic_timeseries uses topic_id column which equals the label
-                label_col = "topic_id" if "topic_id" in ts_filtered.columns else "issue_label"
-                windowed = ts_filtered.groupby(label_col)["mentions"].sum().reset_index()
-                windowed.columns = ["label", "windowed_mentions"]
-                topic_df = topic_df.merge(windowed, on="label", how="left")
+
+                # topic_timeseries always has topic_id column
+                windowed = ts_filtered.groupby("topic_id")["mentions"].sum().reset_index()
+                windowed.columns = [label_col_ta, "windowed_mentions"]
+
+                topic_df = topic_df.merge(windowed, on=label_col_ta, how="left")
                 topic_df["mentions"] = topic_df["windowed_mentions"].fillna(0).astype(int)
+                topic_df = topic_df.drop(columns=["windowed_mentions"], errors="ignore")
             except Exception as e:
-                print(f"Windowed mentions fallback: {e}")
+                print(f"[top-issues] Windowed mentions error: {e}")
 
         topic_df = topic_df.sort_values("mentions", ascending=False)
         issues = []
-        for _, row in topic_df.head(10).iterrows():
-            label = str(row.get("label", row.get("keywords", "Unknown")))
-            if int(row["mentions"]) == 0:
+        for _, row in topic_df.iterrows():
+            label = str(row.get(label_col_ta, row.get("keywords", "Unknown")))
+            mentions = int(row["mentions"])
+            if mentions == 0:
                 continue
             issues.append({
                 "issue": label,
                 "keywords": label,
-                "mentions": int(row["mentions"]),
+                "mentions": mentions,
                 "avg_severity": round(float(row.get("avg_severity", 0.0)), 2)
             })
+            if len(issues) >= 10:
+                break
         return issues
     except FileNotFoundError:
+        return []
+
         return []
 
 
