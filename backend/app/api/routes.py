@@ -277,60 +277,86 @@ async def export_report(limit_months: int = 0):
 
 @router.get("/dashboard/issue-reviews")
 def issue_reviews(issue: str, limit_months: int = 0):
+    """
+    Returns evidence reviews for a given issue category.
+    When limit_months > 0, filters to reviews within the time window.
+    Reads from review_classifications.csv (Phase 31) for time-aware results,
+    falls back to topic_analysis.csv sample_reviews if not yet generated.
+    """
     import ast
+
+    CLF_PATH = "data/processed/review_classifications.csv"
+
+    # ── Primary: time-aware review_classifications.csv ──────────────────────
+    if os.path.exists(CLF_PATH):
+        try:
+            clf_df = pd.read_csv(CLF_PATH)
+
+            # Filter by category
+            matched = clf_df[clf_df["category"].str.strip() == issue.strip()].copy()
+
+            # Filter by date window if requested
+            if limit_months > 0 and "date" in matched.columns:
+                matched = matched[matched["date"].notna() & (matched["date"] != "")]
+                if not matched.empty:
+                    # date column is YYYY-MM (month string)
+                    all_months_in_cat = sorted(matched["date"].unique())
+                    target_months = all_months_in_cat[-limit_months:]
+                    matched = matched[matched["date"].isin(target_months)]
+
+            if not matched.empty:
+                # Sort by confidence descending, deduplicate, return top 20
+                matched = matched.sort_values("confidence", ascending=False)
+                reviews_list = (
+                    matched["text"]
+                    .dropna()
+                    .tolist()
+                )
+                # Basic dedup (exact)
+                seen = set()
+                deduped = []
+                for r in reviews_list:
+                    key = str(r)[:80]
+                    if key not in seen and len(str(r)) > 20:
+                        seen.add(key)
+                        deduped.append(str(r))
+                    if len(deduped) >= 20:
+                        break
+
+                return {
+                    "issue": issue,
+                    "keywords": issue,
+                    "reviews": deduped,
+                    "window": f"Last {limit_months}M" if limit_months > 0 else "All Time",
+                    "total_in_window": len(matched)
+                }
+        except Exception as e:
+            print(f"[issue-reviews] clf fallback: {e}")
+
+    # ── Fallback: pre-stored sample_reviews in topic_analysis.csv ───────────
     try:
         topic_df = pd.read_csv("data/processed/topic_analysis.csv")
-        label_col = "label" if "label" in topic_df.columns else (
-            "topic_id" if "topic_id" in topic_df.columns else topic_df.columns[0]
-        )
         matching_reviews = []
         matched_label = issue
         for _, row in topic_df.iterrows():
-            label = str(row.get(label_col, row.get("keywords", "")))
+            label = str(row.get("label", row.get("keywords", "")))
             if label.strip() == issue.strip():
                 try:
                     matching_reviews = ast.literal_eval(row["sample_reviews"])
                 except Exception:
                     rev_string = str(row["sample_reviews"]).strip('[]')
-                    matching_reviews = [r.strip(" '\"\n") for r in rev_string.split("', '") if r.strip()]
+                    matching_reviews = [r.strip(" '\"\n") for r in rev_string.split("', ") if r.strip()]
                 matched_label = label
                 break
-
-        matching_reviews = [r for r in matching_reviews if len(str(r)) > 20][:20]
-
-        # Build text → date lookup from raw reviews file
-        date_lookup = {}
-        for raw_path in ["data/raw/netflix_reviews.csv", "data/processed/uploaded_reviews.csv"]:
-            if os.path.exists(raw_path):
-                try:
-                    raw_df = pd.read_csv(raw_path)
-                    text_col = next((c for c in ["content", "review", "text"] if c in raw_df.columns), None)
-                    date_col = next((c for c in ["at", "date"] if c in raw_df.columns), None)
-                    if text_col and date_col:
-                        raw_df[date_col] = pd.to_datetime(raw_df[date_col], errors="coerce")
-                        for _, r in raw_df.dropna(subset=[date_col]).iterrows():
-                            key = str(r[text_col]).strip()[:120]
-                            if key not in date_lookup:
-                                date_lookup[key] = r[date_col].strftime("%d %b %Y")
-                    break
-                except Exception as e:
-                    print(f"[issue-reviews] date lookup error: {e}")
-
-        reviews_with_dates = []
-        for rev in matching_reviews:
-            rev_str = str(rev).strip()
-            reviews_with_dates.append({
-                "text": rev_str,
-                "date": date_lookup.get(rev_str[:120], "")
-            })
-
         return {
             "issue": issue,
             "keywords": matched_label,
-            "reviews": reviews_with_dates
+            "reviews": [r for r in matching_reviews if len(str(r)) > 20][:20],
+            "window": "All Time (pre-computed)"
         }
     except FileNotFoundError:
-        return {"issue": issue, "keywords": "", "reviews": []}
+        return {"issue": issue, "keywords": "", "reviews": [], "window": "No data"}
+
 
 # -----------------------------
 # REVIEWS LIST

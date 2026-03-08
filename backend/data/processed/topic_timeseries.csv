@@ -1,84 +1,69 @@
 topic_id,issue_label,month,mentions
-Video & Streaming Playback,Video & Streaming Playback,2026-03,19
+App Crash & Launch Failure,App Crash & Launch Failure,2026-03,133
+App Crash & Launch Failure,App Crash & Launch Failure,2026-02,51
+App Crash & Launch Failure,App Crash & Launch Failure,2026-01,53
+App Crash & Launch Failure,App Crash & Launch Failure,2025-12,48
+App Crash & Launch Failure,App Crash & Launch Failure,2025-11,58
+App Crash & Launch Failure,App Crash & Launch Failure,2025-10,52
+App Crash & Launch Failure,App Crash & Launch Failure,2025-09,60
+App Crash & Launch Failure,App Crash & Launch Failure,2025-07,1
+App Crash & Launch Failure,App Crash & Launch Failure,2025-06,67
+App Crash & Launch Failure,App Crash & Launch Failure,2025-05,104
+App Crash & Launch Failure,App Crash & Launch Failure,2025-04,76
+App Crash & Launch Failure,App Crash & Launch Failure,2025-03,88
+Customer Support,Customer Support,2026-03,2
+Customer Support,Customer Support,2026-02,6
+Customer Support,Customer Support,2026-01,3
+Customer Support,Customer Support,2025-12,9
+Customer Support,Customer Support,2025-11,9
+Customer Support,Customer Support,2025-10,10
+Customer Support,Customer Support,2025-09,8
+Customer Support,Customer Support,2025-06,12
+Customer Support,Customer Support,2025-05,17
+Customer Support,Customer Support,2025-04,15
+Customer Support,Customer Support,2025-03,16
+General App Feedback,Performance & Speed,2026-03,55
+General App Feedback,Performance & Speed,2026-02,173
+General App Feedback,Performance & Speed,2026-01,248
+General App Feedback,Performance & Speed,2025-12,325
+General App Feedback,Performance & Speed,2025-11,237
+General App Feedback,Performance & Speed,2025-10,265
+General App Feedback,Performance & Speed,2025-09,209
+General App Feedback,Performance & Speed,2025-07,1
+General App Feedback,Performance & Speed,2025-06,297
+General App Feedback,Performance & Speed,2025-05,352
+General App Feedback,Performance & Speed,2025-04,351
+General App Feedback,Performance & Speed,2025-03,365
+Video & Streaming Playback,Video & Streaming Playback,2026-03,22
 Video & Streaming Playback,Video & Streaming Playback,2026-02,84
 Video & Streaming Playback,Video & Streaming Playback,2026-01,98
-Video & Streaming Playback,Video & Streaming Playback,2025-12,139
+Video & Streaming Playback,Video & Streaming Playback,2025-12,138
 Video & Streaming Playback,Video & Streaming Playback,2025-11,101
 Video & Streaming Playback,Video & Streaming Playback,2025-10,101
 Video & Streaming Playback,Video & Streaming Playback,2025-09,114
 Video & Streaming Playback,Video & Streaming Playback,2025-08,2
 Video & Streaming Playback,Video & Streaming Playback,2025-07,2
 Video & Streaming Playback,Video & Streaming Playback,2025-06,148
-Video & Streaming Playback,Video & Streaming Playback,2025-05,184
+Video & Streaming Playback,Video & Streaming Playback,2025-05,182
 Video & Streaming Playback,Video & Streaming Playback,2025-04,169
-Video & Streaming Playback,Video & Streaming Playback,2025-03,175
-Video & Streaming Playback,Video & Streaming Playback,2025-02,158
-Video & Streaming Playback,Video & Streaming Playback,2025-01,260
-Video & Streaming Playback,Video & Streaming Playback,2024-12,187
-General App Feedback,Performance & Speed,2026-03,48
-General App Feedback,Performance & Speed,2026-02,173
-General App Feedback,Performance & Speed,2026-01,250
-General App Feedback,Performance & Speed,2025-12,328
-General App Feedback,Performance & Speed,2025-11,243
-General App Feedback,Performance & Speed,2025-10,262
-General App Feedback,Performance & Speed,2025-09,209
-General App Feedback,Performance & Speed,2025-07,1
-General App Feedback,Performance & Speed,2025-06,298
-General App Feedback,Performance & Speed,2025-05,353
-General App Feedback,Performance & Speed,2025-04,351
-General App Feedback,Performance & Speed,2025-03,415
-General App Feedback,Performance & Speed,2025-02,431
-General App Feedback,Performance & Speed,2025-01,596
-General App Feedback,Performance & Speed,2024-12,487
-Subscription & Billing,Subscription & Billing,2026-03,25
-Subscription & Billing,Subscription & Billing,2026-02,76
+Video & Streaming Playback,Video & Streaming Playback,2025-03,156
+Subscription & Billing,Subscription & Billing,2026-03,26
+Subscription & Billing,Subscription & Billing,2026-02,78
 Subscription & Billing,Subscription & Billing,2026-01,98
-Subscription & Billing,Subscription & Billing,2025-12,129
+Subscription & Billing,Subscription & Billing,2025-12,130
 Subscription & Billing,Subscription & Billing,2025-11,106
-Subscription & Billing,Subscription & Billing,2025-10,120
+Subscription & Billing,Subscription & Billing,2025-10,121
 Subscription & Billing,Subscription & Billing,2025-09,134
 Subscription & Billing,Subscription & Billing,2025-08,1
 Subscription & Billing,Subscription & Billing,2025-07,1
 Subscription & Billing,Subscription & Billing,2025-06,134
-Subscription & Billing,Subscription & Billing,2025-05,133
+Subscription & Billing,Subscription & Billing,2025-05,131
 Subscription & Billing,Subscription & Billing,2025-04,179
-Subscription & Billing,Subscription & Billing,2025-03,194
-Subscription & Billing,Subscription & Billing,2025-02,242
-Subscription & Billing,Subscription & Billing,2025-01,315
-Subscription & Billing,Subscription & Billing,2024-12,229
-Customer Support,Customer Support,2026-03,1
-Customer Support,Customer Support,2026-02,6
-Customer Support,Customer Support,2026-01,3
-Customer Support,Customer Support,2025-12,9
-Customer Support,Customer Support,2025-11,10
-Customer Support,Customer Support,2025-10,10
-Customer Support,Customer Support,2025-09,8
-Customer Support,Customer Support,2025-06,12
-Customer Support,Customer Support,2025-05,17
-Customer Support,Customer Support,2025-04,15
-Customer Support,Customer Support,2025-03,19
-Customer Support,Customer Support,2025-02,19
-Customer Support,Customer Support,2025-01,36
-Customer Support,Customer Support,2024-12,15
-App Crash & Launch Failure,App Crash & Launch Failure,2026-03,130
-App Crash & Launch Failure,App Crash & Launch Failure,2026-02,51
-App Crash & Launch Failure,App Crash & Launch Failure,2026-01,53
-App Crash & Launch Failure,App Crash & Launch Failure,2025-12,48
-App Crash & Launch Failure,App Crash & Launch Failure,2025-11,58
-App Crash & Launch Failure,App Crash & Launch Failure,2025-10,52
-App Crash & Launch Failure,App Crash & Launch Failure,2025-09,59
-App Crash & Launch Failure,App Crash & Launch Failure,2025-07,1
-App Crash & Launch Failure,App Crash & Launch Failure,2025-06,68
-App Crash & Launch Failure,App Crash & Launch Failure,2025-05,103
-App Crash & Launch Failure,App Crash & Launch Failure,2025-04,76
-App Crash & Launch Failure,App Crash & Launch Failure,2025-03,103
-App Crash & Launch Failure,App Crash & Launch Failure,2025-02,144
-App Crash & Launch Failure,App Crash & Launch Failure,2025-01,241
-App Crash & Launch Failure,App Crash & Launch Failure,2024-12,130
+Subscription & Billing,Subscription & Billing,2025-03,151
 Content & Features,Content & Features,2026-03,8
 Content & Features,Content & Features,2026-02,31
 Content & Features,Content & Features,2026-01,29
-Content & Features,Content & Features,2025-12,46
+Content & Features,Content & Features,2025-12,45
 Content & Features,Content & Features,2025-11,30
 Content & Features,Content & Features,2025-10,41
 Content & Features,Content & Features,2025-09,30
@@ -86,24 +71,18 @@ Content & Features,Content & Features,2025-08,1
 Content & Features,Content & Features,2025-06,53
 Content & Features,Content & Features,2025-05,50
 Content & Features,Content & Features,2025-04,49
-Content & Features,Content & Features,2025-03,59
-Content & Features,Content & Features,2025-02,59
-Content & Features,Content & Features,2025-01,74
-Content & Features,Content & Features,2024-12,60
+Content & Features,Content & Features,2025-03,50
 Bugs & Technical Errors,Bugs & Technical Errors,2026-03,11
-Bugs & Technical Errors,Bugs & Technical Errors,2026-02,15
-Bugs & Technical Errors,Bugs & Technical Errors,2026-01,14
-Bugs & Technical Errors,Bugs & Technical Errors,2025-12,15
+Bugs & Technical Errors,Bugs & Technical Errors,2026-02,16
+Bugs & Technical Errors,Bugs & Technical Errors,2026-01,15
+Bugs & Technical Errors,Bugs & Technical Errors,2025-12,16
 Bugs & Technical Errors,Bugs & Technical Errors,2025-11,7
 Bugs & Technical Errors,Bugs & Technical Errors,2025-10,13
 Bugs & Technical Errors,Bugs & Technical Errors,2025-09,15
 Bugs & Technical Errors,Bugs & Technical Errors,2025-06,18
-Bugs & Technical Errors,Bugs & Technical Errors,2025-05,25
+Bugs & Technical Errors,Bugs & Technical Errors,2025-05,24
 Bugs & Technical Errors,Bugs & Technical Errors,2025-04,22
-Bugs & Technical Errors,Bugs & Technical Errors,2025-03,37
-Bugs & Technical Errors,Bugs & Technical Errors,2025-02,36
-Bugs & Technical Errors,Bugs & Technical Errors,2025-01,50
-Bugs & Technical Errors,Bugs & Technical Errors,2024-12,36
+Bugs & Technical Errors,Bugs & Technical Errors,2025-03,29
 Performance & Speed,Performance & Speed,2026-03,4
 Performance & Speed,Performance & Speed,2026-02,7
 Performance & Speed,Performance & Speed,2026-01,8
@@ -111,43 +90,34 @@ Performance & Speed,Performance & Speed,2025-12,9
 Performance & Speed,Performance & Speed,2025-11,15
 Performance & Speed,Performance & Speed,2025-10,10
 Performance & Speed,Performance & Speed,2025-09,8
-Performance & Speed,Performance & Speed,2025-06,14
+Performance & Speed,Performance & Speed,2025-06,13
 Performance & Speed,Performance & Speed,2025-05,14
 Performance & Speed,Performance & Speed,2025-04,11
-Performance & Speed,Performance & Speed,2025-03,18
-Performance & Speed,Performance & Speed,2025-02,16
-Performance & Speed,Performance & Speed,2025-01,18
-Performance & Speed,Performance & Speed,2024-12,15
-Account & Login,Account & Login,2026-03,6
+Performance & Speed,Performance & Speed,2025-03,15
+Account & Login,Account & Login,2026-03,7
 Account & Login,Account & Login,2026-02,17
 Account & Login,Account & Login,2026-01,36
 Account & Login,Account & Login,2025-12,29
-Account & Login,Account & Login,2025-11,37
-Account & Login,Account & Login,2025-10,38
-Account & Login,Account & Login,2025-09,33
+Account & Login,Account & Login,2025-11,38
+Account & Login,Account & Login,2025-10,37
+Account & Login,Account & Login,2025-09,34
 Account & Login,Account & Login,2025-07,1
-Account & Login,Account & Login,2025-06,43
+Account & Login,Account & Login,2025-06,42
 Account & Login,Account & Login,2025-05,46
-Account & Login,Account & Login,2025-04,58
-Account & Login,Account & Login,2025-03,98
-Account & Login,Account & Login,2025-02,80
-Account & Login,Account & Login,2025-01,137
-Account & Login,Account & Login,2024-12,82
+Account & Login,Account & Login,2025-04,57
+Account & Login,Account & Login,2025-03,75
 Download & Offline,Download & Offline,2026-03,1
-Download & Offline,Download & Offline,2026-02,11
+Download & Offline,Download & Offline,2026-02,12
 Download & Offline,Download & Offline,2026-01,9
 Download & Offline,Download & Offline,2025-12,13
 Download & Offline,Download & Offline,2025-11,14
 Download & Offline,Download & Offline,2025-10,17
 Download & Offline,Download & Offline,2025-09,13
 Download & Offline,Download & Offline,2025-07,1
-Download & Offline,Download & Offline,2025-06,23
+Download & Offline,Download & Offline,2025-06,24
 Download & Offline,Download & Offline,2025-05,16
-Download & Offline,Download & Offline,2025-04,23
-Download & Offline,Download & Offline,2025-03,21
-Download & Offline,Download & Offline,2025-02,33
-Download & Offline,Download & Offline,2025-01,26
-Download & Offline,Download & Offline,2024-12,44
+Download & Offline,Download & Offline,2025-04,22
+Download & Offline,Download & Offline,2025-03,18
 UI & Navigation,UI & Navigation,2026-02,1
 UI & Navigation,UI & Navigation,2026-01,3
 UI & Navigation,UI & Navigation,2025-12,6
@@ -157,10 +127,7 @@ UI & Navigation,UI & Navigation,2025-09,6
 UI & Navigation,UI & Navigation,2025-06,23
 UI & Navigation,UI & Navigation,2025-05,9
 UI & Navigation,UI & Navigation,2025-04,7
-UI & Navigation,UI & Navigation,2025-03,8
-UI & Navigation,UI & Navigation,2025-02,9
-UI & Navigation,UI & Navigation,2025-01,7
-UI & Navigation,UI & Navigation,2024-12,3
+UI & Navigation,UI & Navigation,2025-03,5
 Privacy & Security,Privacy & Security,2026-02,3
 Privacy & Security,Privacy & Security,2026-01,2
 Privacy & Security,Privacy & Security,2025-12,2
@@ -169,10 +136,7 @@ Privacy & Security,Privacy & Security,2025-09,2
 Privacy & Security,Privacy & Security,2025-06,3
 Privacy & Security,Privacy & Security,2025-05,2
 Privacy & Security,Privacy & Security,2025-04,6
-Privacy & Security,Privacy & Security,2025-03,5
-Privacy & Security,Privacy & Security,2025-02,7
-Privacy & Security,Privacy & Security,2025-01,5
-Privacy & Security,Privacy & Security,2024-12,9
+Privacy & Security,Privacy & Security,2025-03,2
 Notifications & Spam,Notifications & Spam,2026-02,2
 Notifications & Spam,Notifications & Spam,2026-01,4
 Notifications & Spam,Notifications & Spam,2025-12,6
@@ -181,7 +145,4 @@ Notifications & Spam,Notifications & Spam,2025-09,1
 Notifications & Spam,Notifications & Spam,2025-06,3
 Notifications & Spam,Notifications & Spam,2025-05,5
 Notifications & Spam,Notifications & Spam,2025-04,2
-Notifications & Spam,Notifications & Spam,2025-03,9
-Notifications & Spam,Notifications & Spam,2025-02,4
-Notifications & Spam,Notifications & Spam,2025-01,10
-Notifications & Spam,Notifications & Spam,2024-12,7
+Notifications & Spam,Notifications & Spam,2025-03,8

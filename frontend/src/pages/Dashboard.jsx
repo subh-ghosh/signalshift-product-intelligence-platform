@@ -65,6 +65,8 @@ export default function Dashboard() {
     const [progress, setProgress] = useState({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
     const [syncStatus, setSyncStatus] = useState(null)
     const [alerts, setAlerts] = useState([])
+    const [reviewWindow, setReviewWindow] = useState("")
+    const [totalInWindow, setTotalInWindow] = useState(0)
     
     // ── GLOBAL RANGE STATE ──────────────────────────────────────────
     const [range, setRange] = useState("ALL")
@@ -201,10 +203,14 @@ export default function Dashboard() {
             })
             setReviews(res.data.reviews || [])
             setIssueKeywords(res.data.keywords || "")
+            setReviewWindow(res.data.window || "")
+            setTotalInWindow(res.data.total_in_window || 0)
         } catch (err) {
             console.error(err)
             setReviews([])
             setIssueKeywords("")
+            setReviewWindow("")
+            setTotalInWindow(0)
         } finally {
             setChartsLoading(false)
         }
@@ -375,49 +381,34 @@ export default function Dashboard() {
             {/* Evidence Reviews */}
             {reviews.length > 0 && (
                 <div className="glass-card">
-                    <h2 style={{ marginTop: 0 }}>High-Signal Evidence: {issue}</h2>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <h2 style={{ marginTop: 0 }}>High-Signal Evidence: {issue}</h2>
+                        {reviewWindow && (
+                            <span style={{
+                                fontSize: "11px", fontWeight: 700, padding: "4px 10px",
+                                borderRadius: "20px", background: "rgba(229,9,20,0.15)",
+                                border: "1px solid rgba(229,9,20,0.4)", color: "#E50914",
+                                whiteSpace: "nowrap"
+                            }}>
+                                🕐 {reviewWindow}{totalInWindow > 0 ? ` · ${totalInWindow.toLocaleString()} reviews` : ""}
+                            </span>
+                        )}
+                    </div>
                     <p style={{ fontSize: "13px", color: "#888", marginBottom: "15px" }}>
-                        Curated feedback filtered for detail, uniqueness, and business impact.
+                        Showing top {reviews.length} curated reviews — filtered by confidence score and deduplicated.
                     </p>
-                    <div style={{ maxHeight: "450px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
-                        {reviews.map((r, i) => {
-                            const text = typeof r === "object" ? r.text : r
-                            const date = typeof r === "object" ? r.date : ""
-                            return (
-                                <div key={i} style={{
-                                    padding: "15px 18px",
-                                    background: "rgba(255,255,255,0.03)",
-                                    borderRadius: "10px",
-                                    fontSize: "14px",
-                                    borderLeft: "3px solid #E50914",
-                                    lineHeight: "1.6"
-                                }}>
-                                    <div>
-                                        "{highlightEntities(text, issueKeywords)}"
-                                    </div>
-                                    {date && (
-                                        <div style={{
-                                            marginTop: "10px",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px"
-                                        }}>
-                                            <span style={{
-                                                fontSize: "11px",
-                                                color: "#555",
-                                                background: "rgba(255,255,255,0.05)",
-                                                border: "1px solid rgba(255,255,255,0.08)",
-                                                borderRadius: "20px",
-                                                padding: "2px 10px",
-                                                letterSpacing: "0.03em"
-                                            }}>
-                                                📅 {date}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        })}
+                    <div style={{ maxHeight: "400px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+                        {reviews.map((r, i) => (
+                            <div key={i} style={{
+                                padding: "15px",
+                                background: "rgba(255,255,255,0.03)",
+                                borderRadius: "8px",
+                                fontSize: "14px",
+                                borderLeft: "3px solid #E50914"
+                            }}>
+                                "{highlightEntities(r, issueKeywords)}"
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

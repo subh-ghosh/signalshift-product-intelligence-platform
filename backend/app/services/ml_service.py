@@ -288,6 +288,9 @@ class MLService:
         aspect_stats = {aspect: 0 for aspect in self.aspect_config.keys()}
         aspect_stats["General"] = 0
 
+        # ── PHASE 31: Per-review classifications (for time-aware evidence) ──
+        review_classifications = []  # list of dicts: {text, category, date, severity, confidence}
+
         # ── PHASE 24 SETUP: Pre-build taxonomy category embeddings ────────────
         # We import here to reuse the singleton that's already cached
         from app.ml.issue_labeler import (
@@ -411,6 +414,16 @@ class MLService:
                         elif confidence > heap[0][0]:
                             heapq.heapreplace(heap, (confidence, review_text))
 
+                    # ── PHASE 31: Record per-review classification with date ──
+                    if len(review_text) > 20:
+                        review_classifications.append({
+                            "text": review_text,
+                            "category": canonical_label,
+                            "date":  month_str if month_str != "NaT" else "",
+                            "severity": sev,
+                            "confidence": round(float(confidence), 4)
+                        })
+
             except Exception as e:
                 print(f"Error processing topic batch {i}: {e}")
 
@@ -476,9 +489,15 @@ class MLService:
                 "sample_reviews": final_reviews
             })
 
-        # Export core topic clusters — already canonical, no Phase 23 merge needed
+        # Export core topic clusters
         cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
         cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
+
+        # ── PHASE 31: Save per-review classifications for time-aware evidence ─
+        if review_classifications:
+            clf_df = pd.DataFrame(review_classifications)
+            clf_df.to_csv("data/processed/review_classifications.csv", index=False)
+            print(f"[Phase 31] Saved {len(clf_df):,} per-review classifications to review_classifications.csv")
 
         # ── PHASE 27: ANOMALY / EMERGING ISSUE DETECTION ─────────────────────
         # Reviews that scored below the confidence threshold are in the
