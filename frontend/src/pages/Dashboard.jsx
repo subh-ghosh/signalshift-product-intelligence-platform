@@ -6,6 +6,9 @@ import TopIssuesChart from "../components/TopIssuesChart"
 import AspectRadarChart from "../components/AspectRadarChart"
 import TrendingChart from "../components/TrendingChart"
 import AiSummaryCard from "../components/AiSummaryCard"
+import KpiBar from "../components/KpiBar"
+import EmergingIssuesPanel from "../components/EmergingIssuesPanel"
+import SemanticDriftPanel from "../components/SemanticDriftPanel"
 import { highlightEntities } from "../utils/highlight_utils.jsx"
 
 // Convert "3M" → 3, "6M" → 6, "12M" → 12, "ALL" → 0
@@ -266,8 +269,8 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* ── HEADER with global selector ────────────────────────────── */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px", flexWrap: "wrap", gap: "16px" }}>
+            {/* ── GLOBAL TIMELINE SELECTOR ────────────────────────────── */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
                 <div>
                     <h1 style={{ margin: 0 }}>SignalShift Intelligence</h1>
                     <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#666" }}>
@@ -278,13 +281,15 @@ export default function Dashboard() {
                     </p>
                 </div>
                 <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-                    {/* 🌐 GLOBAL TIMELINE SELECTOR */}
                     <TimelineSelector range={range} setRange={setRange} />
                     <button className="btn-primary" onClick={downloadExecutiveReport}>
                         📄 Export Report ({range})
                     </button>
                 </div>
             </div>
+
+            {/* KPI Bar */}
+            <KpiBar key={`kpi-${refreshKey}-${range}`} limitMonths={limitMonths} />
 
             {/* Upload Section */}
             <div className="glass-card" style={{ marginBottom: "40px" }}>
@@ -412,6 +417,18 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
+
+            {/* Emerging Issues + Semantic Drift (2-column) */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px", marginTop: "30px" }}>
+                <div className="glass-card">
+                    <h2 style={{ marginTop: 0 }}>⚠️ Emerging Issue Clusters</h2>
+                    <EmergingIssuesPanel key={`emerge-${refreshKey}-${range}`} limitMonths={limitMonths} />
+                </div>
+                <div className="glass-card">
+                    <h2 style={{ marginTop: 0 }}>📈 Semantic Drift Monitor</h2>
+                    <SemanticDriftPanel key={`drift-${refreshKey}-${range}`} limitMonths={limitMonths} />
+                </div>
+            </div>
         </div>
     )
 }

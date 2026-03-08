@@ -239,18 +239,23 @@ def get_topic_benchmark():
         return []
 
 @router.get("/dashboard/trending-issues")
-def trending_issues():
-    """Serves time-series data of topic prevalence, formatted for Recharts."""
+def trending_issues(limit_months: int = 0):
+    """Serves time-series data of topic prevalence. Top-N chosen within the selected window."""
     try:
         df = pd.read_csv("data/processed/topic_timeseries.csv")
-        # Sort to ensure chronological order
         df = df.sort_values(by="month")
-        
-        # Filter to the Top 5 most prevalent issues overall to avoid cluttering the graph
-        top_issues = df.groupby("issue_label")["mentions"].sum().nlargest(5).index
+
+        # Pick top-5 issues BY the selected window (not all time)
+        if limit_months > 0:
+            all_months = sorted(df["month"].unique())
+            target_months = all_months[-limit_months:]
+            window_df = df[df["month"].isin(target_months)]
+        else:
+            window_df = df
+
+        top_issues = window_df.groupby("issue_label")["mentions"].sum().nlargest(5).index
         df_top = df[df["issue_label"].isin(top_issues)]
-        
-        # Pivot table: rows = month, columns = issue_label, values = mentions
+
         pivot = df_top.pivot_table(index="month", columns="issue_label", values="mentions", fill_value=0).reset_index()
         return pivot.to_dict(orient="records")
     except Exception as e:
@@ -366,6 +371,120 @@ def issue_reviews(issue: str, limit_months: int = 0):
 def reviews():
     df = get_dashboard_dataset()
     return df.head(50).to_dict(orient="records")
+
+
+# -----------------------------
+# KPI SUMMARY
+# -----------------------------
+
+@router.get("/dashboard/kpis")
+def dashboard_kpis(limit_months: int = 0):
+    """Returns key metrics for the selected time window: total reviews, avg rating, positive %, active issues."""
+    try:
+        df = get_dashboard_dataset()
+        if limit_months > 0 and "at" in df.columns:
+            df["at"] = pd.to_datetime(df["at"], errors="coerce")
+            cutoff = pd.Timestamp.now() - pd.DateOffset(months=limit_months)
+            df = df[df["at"] >= cutoff]
+
+        total = len(df)
+        avg_rating = round(float(df["score"].mean()), 2) if "score" in df.columns else None
+        positive = int((df["sentiment"] == "positive").sum()) if "sentiment" in df.columns else 0
+        positive_pct = round((positive / total) * 100, 1) if total > 0 else 0
+
+        # Active issue count from timeseries within window
+        active_issues = 0
+        try:
+            ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+            if limit_months > 0:
+                all_months = sorted(ts_df["month"].unique())
+                target = all_months[-limit_months:]
+                ts_df = ts_df[ts_df["month"].isin(target)]
+            active_issues = int(ts_df.groupby("issue_label")["mentions"].sum().gt(0).sum())
+        except Exception:
+            pass
+
+        return {
+            "total_reviews": total,
+            "avg_rating": avg_rating,
+            "positive_pct": positive_pct,
+            "active_issues": active_issues,
+            "window": f"Last {limit_months}M" if limit_months > 0 else "All Time"
+        }
+    except Exception as e:
+        print(f"[kpis] error: {e}")
+        return {"total_reviews": 0, "avg_rating": None, "positive_pct": 0, "active_issues": 0}
+
+
+# -----------------------------
+# EMERGING ISSUES
+# -----------------------------
+
+@router.get("/dashboard/emerging-issues")
+def emerging_issues_endpoint(limit_months: int = 0):
+    """Returns flagged emerging issue clusters."""
+    try:
+        df = pd.read_csv("data/processed/emerging_issues.csv")
+        flagged = df[df["is_flagged"] == True].copy()
+
+        # Sort by volume descending
+        flagged = flagged.sort_values("estimated_volume", ascending=False)
+
+        result = []
+        for _, row in flagged.iterrows():
+            samples = []
+            for col in ["sample_review_1", "sample_review_2", "sample_review_3"]:
+                val = str(row.get(col, ""))
+                if val and val != "nan" and len(val) > 10:
+                    samples.append(val[:180])
+            result.append({
+                "cluster_id": int(row["cluster_id"]),
+                "estimated_volume": int(row["estimated_volume"]),
+                "sample_reviews": samples
+            })
+        return result
+    except FileNotFoundError:
+        return []
+
+
+# -----------------------------
+# SEMANTIC DRIFT
+# -----------------------------
+
+@router.get("/dashboard/semantic-drift")
+def semantic_drift_endpoint(limit_months: int = 0):
+    """Returns semantically evolving categories (drift > threshold), optionally filtered to recent window."""
+    try:
+        df = pd.read_csv("data/processed/semantic_drift.csv")
+
+        # Filter to selected window if limit_months set
+        if limit_months > 0:
+            all_months = sorted(df["month_from"].unique())
+            target_months = all_months[-limit_months:]
+            df = df[df["month_from"].isin(target_months)]
+
+        # Aggregate avg drift per category
+        agg = (
+            df.groupby("category")
+            .agg(avg_drift=("drift_score", "mean"), max_drift=("drift_score", "max"),
+                 n_months=("drift_score", "count"))
+            .reset_index()
+        )
+        agg["is_evolving"] = agg["avg_drift"] > 0.10
+        agg = agg[agg["is_evolving"]].sort_values("avg_drift", ascending=False)
+
+        result = []
+        for _, row in agg.iterrows():
+            result.append({
+                "category": row["category"],
+                "avg_drift": round(float(row["avg_drift"]), 4),
+                "max_drift": round(float(row["max_drift"]), 4),
+                "n_months": int(row["n_months"]),
+                "trend_bar": min(round(row["avg_drift"] * 50), 5)  # 0-5 visual bar
+            })
+        return result
+    except FileNotFoundError:
+        return []
 
 
 # -----------------------------

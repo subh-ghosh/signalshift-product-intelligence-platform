@@ -11,23 +11,28 @@ export default function TrendingChart({ range, setRange }) {
     const [loading, setLoading] = useState(true);
     const [keys, setKeys] = useState([]);
 
+    // Re-fetch from server when range changes — top-5 is now computed server-side within the window
     useEffect(() => {
         fetchTrendingData();
-    }, []);
+    }, [range]);
 
     useEffect(() => {
         sliceData(range);
-    }, [range, allData]);
+    }, [allData]);   // still client-slice for the chart line display
 
     const fetchTrendingData = async () => {
+        setLoading(true);
         try {
-            const res = await api.get("/dashboard/trending-issues");
+            const limitMonths = range === "3M" ? 3 : range === "6M" ? 6 : range === "12M" ? 12 : 0;
+            const res = await api.get("/dashboard/trending-issues", { params: { limit_months: limitMonths } });
             const rawData = res.data;
-            
             if (rawData.length > 0) {
                 const firstRowKeys = Object.keys(rawData[0]).filter(k => k !== "month");
                 setKeys(firstRowKeys);
                 setAllData(rawData);
+            } else {
+                setAllData([]);
+                setKeys([]);
             }
         } catch (err) {
             console.error("Error fetching trending data:", err);
