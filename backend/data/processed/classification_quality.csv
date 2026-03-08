@@ -1,0 +1,2 @@
+metric,value,n_categories,n_samples,threshold_confidence,dedup_threshold
+silhouette_score,0.2105,13,260,0.3,0.85

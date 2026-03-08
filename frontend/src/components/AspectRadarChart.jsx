@@ -10,15 +10,15 @@ import {
 import { useEffect, useState } from 'react';
 import api from '../services/api';
 
-export default function AspectRadarChart() {
+export default function AspectRadarChart({ limitMonths = 0 }) {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchAspects = async () => {
+            setLoading(true);
             try {
-                const res = await api.get("/dashboard/aspects");
-                // Filters out "General" to focus on business-specific categories
+                const res = await api.get("/dashboard/aspects", { params: { limit_months: limitMonths } });
                 const filteredData = (res.data || []).filter(item => item.aspect !== "General");
                 setData(filteredData);
             } catch (err) {
@@ -28,7 +28,7 @@ export default function AspectRadarChart() {
             }
         };
         fetchAspects();
-    }, []);
+    }, [limitMonths]);
 
     if (loading) return <p style={{ textAlign: 'center', color: '#666' }}>Loading specialized aspects...</p>;
     if (data.length === 0) return <p style={{ textAlign: 'center', color: '#666' }}>No aspect data available yet.</p>;

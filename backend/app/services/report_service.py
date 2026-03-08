@@ -17,11 +17,35 @@ class ReportService:
         text = text.replace("\u2014", "--").replace("\u2013", "-").replace("\u2026", "...")
         return text.encode('latin-1', 'ignore').decode('latin-1')
 
-    def generate_pdf_report(self):
+    def generate_pdf_report(self, limit_months: int = 0):
         try:
             # Load Data
             aspect_df  = pd.read_csv(os.path.join(self.data_dir, "aspect_analysis.csv"))
             topic_df   = pd.read_csv(os.path.join(self.data_dir, "topic_analysis.csv"))
+
+            # Apply time window filter for mention counts
+            window_label = f"Last {limit_months} Months" if limit_months > 0 else "All Time"
+            if limit_months > 0:
+                try:
+                    ts_df = pd.read_csv(os.path.join(self.data_dir, "topic_timeseries.csv"))
+                    all_months = sorted(ts_df["month"].unique())
+                    target_months = all_months[-limit_months:]
+                    ts_filt = ts_df[ts_df["month"].isin(target_months)]
+                    label_col = "topic_id" if "topic_id" in ts_filt.columns else "issue_label"
+                    windowed = ts_filt.groupby(label_col)["mentions"].sum().reset_index()
+                    windowed.columns = ["label", "windowed_mentions"]
+                    topic_df = topic_df.merge(windowed, on="label", how="left")
+                    topic_df["mentions"] = topic_df["windowed_mentions"].fillna(0).astype(int)
+                    # Scale aspects proportionally
+                    total_months = max(len(all_months), 1)
+                    eff = min(limit_months, total_months)
+                    scale = eff / total_months
+                    aspect_df = aspect_df.copy()
+                    aspect_df["mentions"] = (aspect_df["mentions"] * scale).round().astype(int)
+                except Exception as e:
+                    print(f"[PDF] Windowed filter error: {e}")
+
+            topic_df = topic_df.sort_values("mentions", ascending=False)
 
             # Optional enrichment data
             quality_df  = None
@@ -48,7 +72,7 @@ class ReportService:
             pdf.set_text_color(255, 255, 255)
             pdf.cell(0, 20, "SignalShift Intelligence", ln=True, align='C')
             pdf.set_font("Helvetica", "", 12)
-            pdf.cell(0, 10, f"Executive Report  |  {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align='C')
+            pdf.cell(0, 10, f"Executive Report  |  {window_label}  |  {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align='C')
             pdf.ln(20)
 
             # ── Model Quality Card ───────────────────────────────────────────

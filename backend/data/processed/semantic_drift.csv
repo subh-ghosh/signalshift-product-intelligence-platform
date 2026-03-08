@@ -1,0 +1,174 @@
+category,month_from,month_to,drift_score,cosine_similarity,is_evolving
+Account & Login,2024-12,2025-01,0.0479,0.9521,False
+Account & Login,2025-01,2025-02,0.0297,0.9703,False
+Account & Login,2025-02,2025-03,0.0498,0.9502,False
+Account & Login,2025-03,2025-04,0.0381,0.9619,False
+Account & Login,2025-04,2025-05,0.038,0.962,False
+Account & Login,2025-05,2025-06,0.049,0.951,False
+Account & Login,2025-06,2025-07,0.4469,0.5531,True
+Account & Login,2025-07,2025-09,0.4184,0.5816,True
+Account & Login,2025-09,2025-10,0.0333,0.9667,False
+Account & Login,2025-10,2025-11,0.0517,0.9483,False
+Account & Login,2025-11,2025-12,0.0648,0.9352,False
+Account & Login,2025-12,2026-01,0.06,0.94,False
+Account & Login,2026-01,2026-02,0.0985,0.9015,False
+Account & Login,2026-02,2026-03,0.1634,0.8366,True
+App Crash & Launch Failure,2024-12,2025-01,0.0699,0.9301,False
+App Crash & Launch Failure,2025-01,2025-02,0.0597,0.9403,False
+App Crash & Launch Failure,2025-02,2025-03,0.0505,0.9495,False
+App Crash & Launch Failure,2025-03,2025-04,0.0487,0.9513,False
+App Crash & Launch Failure,2025-04,2025-05,0.0577,0.9423,False
+App Crash & Launch Failure,2025-05,2025-06,0.0508,0.9492,False
+App Crash & Launch Failure,2025-06,2025-07,0.4106,0.5894,True
+App Crash & Launch Failure,2025-07,2025-09,0.4138,0.5862,True
+App Crash & Launch Failure,2025-09,2025-10,0.0392,0.9608,False
+App Crash & Launch Failure,2025-10,2025-11,0.0761,0.9239,False
+App Crash & Launch Failure,2025-11,2025-12,0.0479,0.9521,False
+App Crash & Launch Failure,2025-12,2026-01,0.0384,0.9616,False
+App Crash & Launch Failure,2026-01,2026-02,0.0458,0.9542,False
+App Crash & Launch Failure,2026-02,2026-03,0.0747,0.9253,False
+Bugs & Technical Errors,2024-12,2025-01,0.0913,0.9087,False
+Bugs & Technical Errors,2025-01,2025-02,0.0626,0.9374,False
+Bugs & Technical Errors,2025-02,2025-03,0.0775,0.9225,False
+Bugs & Technical Errors,2025-03,2025-04,0.0859,0.9141,False
+Bugs & Technical Errors,2025-04,2025-05,0.1033,0.8967,False
+Bugs & Technical Errors,2025-05,2025-06,0.097,0.903,False
+Bugs & Technical Errors,2025-06,2025-09,0.1301,0.8699,False
+Bugs & Technical Errors,2025-09,2025-10,0.145,0.855,False
+Bugs & Technical Errors,2025-10,2025-11,0.2427,0.7573,True
+Bugs & Technical Errors,2025-11,2025-12,0.2546,0.7454,True
+Bugs & Technical Errors,2025-12,2026-01,0.1453,0.8547,False
+Bugs & Technical Errors,2026-01,2026-02,0.1618,0.8382,True
+Bugs & Technical Errors,2026-02,2026-03,0.1915,0.8085,True
+Content & Features,2024-12,2025-01,0.0587,0.9413,False
+Content & Features,2025-01,2025-02,0.0376,0.9624,False
+Content & Features,2025-02,2025-03,0.0431,0.9569,False
+Content & Features,2025-03,2025-04,0.0499,0.9501,False
+Content & Features,2025-04,2025-05,0.054,0.946,False
+Content & Features,2025-05,2025-06,0.0692,0.9308,False
+Content & Features,2025-06,2025-08,0.3991,0.6009,True
+Content & Features,2025-08,2025-09,0.3668,0.6332,True
+Content & Features,2025-09,2025-10,0.0505,0.9495,False
+Content & Features,2025-10,2025-11,0.0628,0.9372,False
+Content & Features,2025-11,2025-12,0.0541,0.9459,False
+Content & Features,2025-12,2026-01,0.0493,0.9507,False
+Content & Features,2026-01,2026-02,0.0494,0.9506,False
+Content & Features,2026-02,2026-03,0.0876,0.9124,False
+Customer Support,2024-12,2025-01,0.099,0.901,False
+Customer Support,2025-01,2025-02,0.1123,0.8877,False
+Customer Support,2025-02,2025-03,0.1166,0.8834,False
+Customer Support,2025-03,2025-04,0.128,0.872,False
+Customer Support,2025-04,2025-05,0.137,0.863,False
+Customer Support,2025-05,2025-06,0.153,0.847,True
+Customer Support,2025-06,2025-09,0.2027,0.7973,True
+Customer Support,2025-09,2025-10,0.1856,0.8144,True
+Customer Support,2025-10,2025-11,0.2036,0.7964,True
+Customer Support,2025-11,2025-12,0.2654,0.7346,True
+Customer Support,2025-12,2026-01,0.3716,0.6284,True
+Customer Support,2026-01,2026-02,0.3623,0.6377,True
+Customer Support,2026-02,2026-03,0.6763,0.3237,True
+Download & Offline,2024-12,2025-01,0.046,0.954,False
+Download & Offline,2025-01,2025-02,0.0467,0.9533,False
+Download & Offline,2025-02,2025-03,0.0439,0.9561,False
+Download & Offline,2025-03,2025-04,0.035,0.965,False
+Download & Offline,2025-04,2025-05,0.0787,0.9213,False
+Download & Offline,2025-05,2025-06,0.1203,0.8797,False
+Download & Offline,2025-06,2025-07,0.3965,0.6035,True
+Download & Offline,2025-07,2025-09,0.3735,0.6265,True
+Download & Offline,2025-09,2025-10,0.0809,0.9191,False
+Download & Offline,2025-10,2025-11,0.0639,0.9361,False
+Download & Offline,2025-11,2025-12,0.0913,0.9087,False
+Download & Offline,2025-12,2026-01,0.1515,0.8485,True
+Download & Offline,2026-01,2026-02,0.1933,0.8067,True
+Download & Offline,2026-02,2026-03,0.3484,0.6516,True
+General App Feedback,2024-12,2025-01,0.1225,0.8775,False
+General App Feedback,2025-01,2025-02,0.1576,0.8424,True
+General App Feedback,2025-02,2025-03,0.2,0.8,True
+General App Feedback,2025-03,2025-04,0.1336,0.8664,False
+General App Feedback,2025-04,2025-05,0.1262,0.8738,False
+General App Feedback,2025-05,2025-06,0.1017,0.8983,False
+General App Feedback,2025-06,2025-07,0.5847,0.4153,True
+General App Feedback,2025-07,2025-09,0.6087,0.3913,True
+General App Feedback,2025-09,2025-10,0.1957,0.8043,True
+General App Feedback,2025-10,2025-11,0.1926,0.8074,True
+General App Feedback,2025-11,2025-12,0.0985,0.9015,False
+General App Feedback,2025-12,2026-01,0.1094,0.8906,False
+General App Feedback,2026-01,2026-02,0.2725,0.7275,True
+General App Feedback,2026-02,2026-03,0.2678,0.7322,True
+Notifications & Spam,2024-12,2025-01,0.1256,0.8744,False
+Notifications & Spam,2025-01,2025-02,0.2256,0.7744,True
+Notifications & Spam,2025-02,2025-03,0.3252,0.6748,True
+Notifications & Spam,2025-03,2025-04,0.4549,0.5451,True
+Notifications & Spam,2025-04,2025-05,0.4193,0.5807,True
+Notifications & Spam,2025-05,2025-06,0.257,0.743,True
+Notifications & Spam,2025-06,2025-09,0.5153,0.4847,True
+Notifications & Spam,2025-09,2025-11,0.5429,0.4571,True
+Notifications & Spam,2025-11,2025-12,0.2867,0.7133,True
+Notifications & Spam,2025-12,2026-01,0.2673,0.7327,True
+Notifications & Spam,2026-01,2026-02,0.3438,0.6562,True
+Performance & Speed,2024-12,2025-01,0.1067,0.8933,False
+Performance & Speed,2025-01,2025-02,0.0806,0.9194,False
+Performance & Speed,2025-02,2025-03,0.1165,0.8835,False
+Performance & Speed,2025-03,2025-04,0.1404,0.8596,False
+Performance & Speed,2025-04,2025-05,0.1295,0.8705,False
+Performance & Speed,2025-05,2025-06,0.0988,0.9012,False
+Performance & Speed,2025-06,2025-09,0.0978,0.9022,False
+Performance & Speed,2025-09,2025-10,0.1751,0.8249,True
+Performance & Speed,2025-10,2025-11,0.2111,0.7889,True
+Performance & Speed,2025-11,2025-12,0.1565,0.8435,True
+Performance & Speed,2025-12,2026-01,0.2195,0.7805,True
+Performance & Speed,2026-01,2026-02,0.2369,0.7631,True
+Performance & Speed,2026-02,2026-03,0.2604,0.7396,True
+Privacy & Security,2024-12,2025-01,0.2074,0.7926,True
+Privacy & Security,2025-01,2025-02,0.2611,0.7389,True
+Privacy & Security,2025-02,2025-03,0.2495,0.7505,True
+Privacy & Security,2025-03,2025-04,0.2775,0.7225,True
+Privacy & Security,2025-04,2025-05,0.4014,0.5986,True
+Privacy & Security,2025-05,2025-06,0.4849,0.5151,True
+Privacy & Security,2025-06,2025-09,0.3568,0.6432,True
+Privacy & Security,2025-09,2025-11,0.4938,0.5062,True
+Privacy & Security,2025-11,2025-12,0.3606,0.6394,True
+Privacy & Security,2025-12,2026-01,0.5335,0.4665,True
+Privacy & Security,2026-01,2026-02,0.4678,0.5322,True
+Subscription & Billing,2024-12,2025-01,0.0545,0.9455,False
+Subscription & Billing,2025-01,2025-02,0.0481,0.9519,False
+Subscription & Billing,2025-02,2025-03,0.0579,0.9421,False
+Subscription & Billing,2025-03,2025-04,0.0625,0.9375,False
+Subscription & Billing,2025-04,2025-05,0.044,0.956,False
+Subscription & Billing,2025-05,2025-06,0.0521,0.9479,False
+Subscription & Billing,2025-06,2025-07,0.4237,0.5763,True
+Subscription & Billing,2025-07,2025-08,0.6155,0.3845,True
+Subscription & Billing,2025-08,2025-09,0.2695,0.7305,True
+Subscription & Billing,2025-09,2025-10,0.0567,0.9433,False
+Subscription & Billing,2025-10,2025-11,0.0565,0.9435,False
+Subscription & Billing,2025-11,2025-12,0.0846,0.9154,False
+Subscription & Billing,2025-12,2026-01,0.0643,0.9357,False
+Subscription & Billing,2026-01,2026-02,0.0416,0.9584,False
+Subscription & Billing,2026-02,2026-03,0.0591,0.9409,False
+UI & Navigation,2024-12,2025-01,0.3239,0.6761,True
+UI & Navigation,2025-01,2025-02,0.2369,0.7631,True
+UI & Navigation,2025-02,2025-03,0.166,0.834,True
+UI & Navigation,2025-03,2025-04,0.232,0.768,True
+UI & Navigation,2025-04,2025-05,0.2332,0.7668,True
+UI & Navigation,2025-05,2025-06,0.1043,0.8957,False
+UI & Navigation,2025-06,2025-09,0.1418,0.8582,False
+UI & Navigation,2025-09,2025-10,0.2357,0.7643,True
+UI & Navigation,2025-10,2025-11,0.2584,0.7416,True
+UI & Navigation,2025-11,2025-12,0.2359,0.7641,True
+UI & Navigation,2025-12,2026-01,0.4058,0.5942,True
+UI & Navigation,2026-01,2026-02,0.624,0.376,True
+Video & Streaming Playback,2024-12,2025-01,0.0484,0.9516,False
+Video & Streaming Playback,2025-01,2025-02,0.0408,0.9592,False
+Video & Streaming Playback,2025-02,2025-03,0.0553,0.9447,False
+Video & Streaming Playback,2025-03,2025-04,0.0392,0.9608,False
+Video & Streaming Playback,2025-04,2025-05,0.0638,0.9362,False
+Video & Streaming Playback,2025-05,2025-06,0.0848,0.9152,False
+Video & Streaming Playback,2025-06,2025-07,0.3993,0.6007,True
+Video & Streaming Playback,2025-07,2025-08,0.4993,0.5007,True
+Video & Streaming Playback,2025-08,2025-09,0.1907,0.8093,True
+Video & Streaming Playback,2025-09,2025-10,0.0402,0.9598,False
+Video & Streaming Playback,2025-10,2025-11,0.0409,0.9591,False
+Video & Streaming Playback,2025-11,2025-12,0.047,0.953,False
+Video & Streaming Playback,2025-12,2026-01,0.0501,0.9499,False
+Video & Streaming Playback,2026-01,2026-02,0.0524,0.9476,False
+Video & Streaming Playback,2026-02,2026-03,0.0755,0.9245,False

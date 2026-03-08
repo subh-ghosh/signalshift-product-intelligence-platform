@@ -50,14 +50,15 @@ function CustomTooltip({ active, payload }) {
   )
 }
 
-export default function TopIssuesChart({ onIssueClick }) {
+export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchIssues = async () => {
+      setLoading(true)
       try {
-        const res = await api.get("/dashboard/top-issues")
+        const res = await api.get("/dashboard/top-issues", { params: { limit_months: limitMonths } })
         setData(res.data || [])
       } catch (err) {
         console.error("Failed to load issues", err)
@@ -66,7 +67,7 @@ export default function TopIssuesChart({ onIssueClick }) {
       }
     }
     fetchIssues()
-  }, [])
+  }, [limitMonths])
 
   const handleClick = (entry) => {
     if (!entry || !entry.issue) return

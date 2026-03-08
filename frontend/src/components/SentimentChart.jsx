@@ -2,52 +2,50 @@ import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts"
 import { useEffect, useState } from "react"
 import api from "../services/api"
 
-export default function SentimentChart(){
+const COLORS = ["#1DB954", "#E50914"]
 
-  const [data,setData] = useState([])
-  const [loading,setLoading] = useState(true)
+export default function SentimentChart({ limitMonths = 0 }) {
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  useEffect(()=>{
+  useEffect(() => {
+    setLoading(true)
+    api.get("/dashboard/sentiment", { params: { limit_months: limitMonths } })
+      .then(res => {
+        setData([
+          { name: "Positive", value: res.data.positive },
+          { name: "Negative", value: res.data.negative }
+        ])
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [limitMonths])
 
-    api.get("/dashboard/sentiment").then(res=>{
+  if (loading) return <p style={{ color: "#888" }}>Loading sentiment...</p>
 
-      const formatted = [
-        {name:"positive", value:res.data.positive},
-        {name:"negative", value:res.data.negative}
-      ]
+  const total = data.reduce((s, d) => s + d.value, 0)
 
-      setData(formatted)
-      setLoading(false)
-
-    }).catch(()=>{
-      setLoading(false)
-    })
-
-  },[])
-
-  if(loading) return <p>Loading sentiment data...</p>
-
-  return(
-
-    <PieChart width={400} height={300}>
-
+  return (
+    <PieChart width={380} height={300}>
       <Pie
         data={data}
         dataKey="value"
         nameKey="name"
-        outerRadius={100}
-        label
+        outerRadius={110}
+        innerRadius={55}
+        paddingAngle={3}
+        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+        labelLine={false}
       >
-
-        <Cell fill="#4CAF50"/>
-        <Cell fill="#F44336"/>
-
+        {data.map((_, i) => (
+          <Cell key={i} fill={COLORS[i]} />
+        ))}
       </Pie>
-
-      <Tooltip/>
-      <Legend/>
-
+      <Tooltip
+        formatter={(value) => [`${value.toLocaleString()} reviews`, ""]}
+        contentStyle={{ background: "rgba(18,18,18,0.95)", border: "1px solid #333", borderRadius: 8, color: "#fff" }}
+      />
+      <Legend wrapperStyle={{ color: "#ccc", fontSize: 13 }} />
     </PieChart>
-
   )
 }

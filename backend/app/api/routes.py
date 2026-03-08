@@ -105,14 +105,23 @@ def get_dashboard_dataset():
 # -----------------------------
 
 @router.get("/dashboard/sentiment")
-def sentiment_distribution():
-    df = get_dashboard_dataset()
-    positive = (df["sentiment"] == "positive").sum()
-    negative = (df["sentiment"] == "negative").sum()
-    return {
-        "positive": int(positive),
-        "negative": int(negative)
-    }
+def sentiment_distribution(limit_months: int = 0):
+    try:
+        df = get_dashboard_dataset()
+        if limit_months > 0 and "at" in df.columns:
+            df["at"] = pd.to_datetime(df["at"], errors="coerce")
+            cutoff = pd.Timestamp.now() - pd.DateOffset(months=limit_months)
+            df = df[df["at"] >= cutoff]
+        positive = (df["sentiment"] == "positive").sum()
+        negative = (df["sentiment"] == "negative").sum()
+        return {"positive": int(positive), "negative": int(negative)}
+    except Exception as e:
+        print(f"Sentiment error: {e}")
+        df = get_dashboard_dataset()
+        return {
+            "positive": int((df["sentiment"] == "positive").sum()),
+            "negative": int((df["sentiment"] == "negative").sum())
+        }
 
 
 # -----------------------------
@@ -120,13 +129,32 @@ def sentiment_distribution():
 # -----------------------------
 
 @router.get("/dashboard/top-issues")
-def top_issues():
+def top_issues(limit_months: int = 0):
     try:
         topic_df = pd.read_csv("data/processed/topic_analysis.csv")
+
+        # When a time window is selected, recalculate mentions from timeseries
+        if limit_months > 0:
+            try:
+                ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+                all_months = sorted(ts_df["month"].unique())
+                target_months = all_months[-limit_months:]
+                ts_filtered = ts_df[ts_df["month"].isin(target_months)]
+                # topic_timeseries uses topic_id column which equals the label
+                label_col = "topic_id" if "topic_id" in ts_filtered.columns else "issue_label"
+                windowed = ts_filtered.groupby(label_col)["mentions"].sum().reset_index()
+                windowed.columns = ["label", "windowed_mentions"]
+                topic_df = topic_df.merge(windowed, on="label", how="left")
+                topic_df["mentions"] = topic_df["windowed_mentions"].fillna(0).astype(int)
+            except Exception as e:
+                print(f"Windowed mentions fallback: {e}")
+
+        topic_df = topic_df.sort_values("mentions", ascending=False)
         issues = []
         for _, row in topic_df.head(10).iterrows():
-            # Phase 24+: `label` column IS the canonical category name
             label = str(row.get("label", row.get("keywords", "Unknown")))
+            if int(row["mentions"]) == 0:
+                continue
             issues.append({
                 "issue": label,
                 "keywords": label,
@@ -143,10 +171,25 @@ def top_issues():
 # -----------------------------
 
 @router.get("/dashboard/aspects")
-def top_aspects():
+def top_aspects(limit_months: int = 0):
     try:
+        # If no time window, serve the pre-aggregated aspect CSV
+        if limit_months == 0:
+            aspect_df = pd.read_csv("data/processed/aspect_analysis.csv")
+            return aspect_df.sort_values("mentions", ascending=False).to_dict(orient="records")
+        # Windowed: approximate by scaling total mentions by fraction of months active
         aspect_df = pd.read_csv("data/processed/aspect_analysis.csv")
-        return aspect_df.to_dict(orient="records")
+        try:
+            ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+            all_months = sorted(ts_df["month"].unique())
+            total_months = max(len(all_months), 1)
+            effective_months = min(limit_months, total_months)
+            scale = effective_months / total_months
+            aspect_df = aspect_df.copy()
+            aspect_df["mentions"] = (aspect_df["mentions"] * scale).round().astype(int)
+        except Exception:
+            pass
+        return aspect_df.sort_values("mentions", ascending=False).to_dict(orient="records")
     except FileNotFoundError:
         return []
 
@@ -200,15 +243,16 @@ def trending_issues():
         return []
 
 @router.get("/dashboard/export-pdf")
-async def export_report():
-    """Generates and returns a branded PDF executive report."""
-    report_path = report_service.generate_pdf_report()
+async def export_report(limit_months: int = 0):
+    """Generates and returns a branded PDF executive report for the selected time window."""
+    report_path = report_service.generate_pdf_report(limit_months=limit_months)
     if not report_path or not os.path.exists(report_path):
         return {"error": "Failed to generate report"}
-    
+
+    window_label = f"Last{limit_months}M" if limit_months > 0 else "All"
     return FileResponse(
         path=report_path,
-        filename=f"SignalShift_Executive_Report_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf",
+        filename=f"SignalShift_Report_{window_label}_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf",
         media_type="application/pdf"
     )
 

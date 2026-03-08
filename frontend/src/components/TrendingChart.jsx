@@ -89,30 +89,6 @@ export default function TrendingChart({ range, setRange }) {
 
     return (
         <div style={{ width: '100%' }}>
-            {/* Time Range Selector */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', justifyContent: 'flex-end', paddingRight: '30px' }}>
-                {["3M", "6M", "12M", "ALL"].map(r => (
-                    <button 
-                        key={r}
-                        onClick={() => setRange(r)}
-                        style={{
-                            background: range === r ? '#E50914' : 'rgba(255,255,255,0.05)',
-                            color: range === r ? '#fff' : '#ccc',
-                            border: '1px solid',
-                            borderColor: range === r ? '#E50914' : 'rgba(255,255,255,0.1)',
-                            padding: '4px 12px',
-                            borderRadius: '20px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            fontWeight: 'bold'
-                        }}
-                    >
-                        {r}
-                    </button>
-                ))}
-            </div>
-
             <ResponsiveContainer width="100%" height={350}>
                 <AreaChart data={filteredData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <defs>
