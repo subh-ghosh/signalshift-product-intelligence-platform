@@ -7,6 +7,7 @@ import AspectRadarChart from "../components/AspectRadarChart"
 import TrendingChart from "../components/TrendingChart"
 import AiSummaryCard from "../components/AiSummaryCard"
 import KpiBar from "../components/KpiBar"
+import VanguardAlerts from "../components/VanguardAlerts"
 import EmergingIssuesPanel from "../components/EmergingIssuesPanel"
 import SemanticDriftPanel from "../components/SemanticDriftPanel"
 import { SkeletonKpiBar, SkeletonChart, SkeletonCard } from "../components/Skeleton"
@@ -68,8 +69,6 @@ export default function Dashboard() {
     const [refreshKey, setRefreshKey] = useState(0)
     const [progress, setProgress] = useState({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
     const [syncStatus, setSyncStatus] = useState(null)
-    const [alerts, setAlerts] = useState([])
-    const [velocityAlerts, setVelocityAlerts] = useState([])
     const [reviewWindow, setReviewWindow] = useState("")
     const [totalInWindow, setTotalInWindow] = useState(0)
     const [kpiLoading, setKpiLoading] = useState(true)
@@ -81,12 +80,8 @@ export default function Dashboard() {
 
     const fetchData = async () => {
         try {
-            const [syncRes, alertRes] = await Promise.all([
-                api.get("/sync/status"),
-                api.get("/dashboard/alerts")
-            ])
+            const syncRes = await api.get("/sync/status")
             setSyncStatus(syncRes.data)
-            setAlerts(alertRes.data.alerts || [])
         } catch (e) {
             console.error("Failed to fetch dashboard data", e)
         }
@@ -228,17 +223,6 @@ export default function Dashboard() {
         setIssue("")
     }, [range])
 
-    // Fetch velocity-based alerts whenever range changes
-    useEffect(() => {
-        if (limitMonths > 0) {
-            api.get("/dashboard/velocity-alerts", { params: { limit_months: limitMonths } })
-                .then(res => setVelocityAlerts(res.data || []))
-                .catch(() => setVelocityAlerts([]))
-        } else {
-            setVelocityAlerts([])
-        }
-    }, [limitMonths])
-
     const downloadCsv = async () => {
         try {
             setStatus(`Exporting CSV (${range === "ALL" ? "All Time" : `Last ${range}`})...`)
@@ -288,35 +272,8 @@ export default function Dashboard() {
     return (
         <div style={{ padding: "40px", maxWidth: "1400px", margin: "auto" }}>
 
-            {/* Critical Alert Bar */}
-            {(alerts.length > 0 || velocityAlerts.length > 0) && (
-                <div className="glass-card" style={{
-                    marginBottom: "20px",
-                    borderLeft: "4px solid #E50914",
-                    background: velocityAlerts.some(a => a.severity === "CRITICAL") ? "rgba(229, 9, 20, 0.2)" : "rgba(229, 9, 20, 0.1)",
-                    display: "flex", alignItems: "center", gap: "15px"
-                }}>
-                    <span style={{ fontSize: "24px" }}>🚨</span>
-                    <div>
-                        <h3 style={{ margin: 0, color: "#E50914", fontSize: "16px" }}>INTELLIGENCE ALERTS</h3>
-                        {alerts.map(a => (
-                            <p key={a.id} style={{ margin: "5px 0 0", fontSize: "14px", color: "#fff" }}>{a.message}</p>
-                        ))}
-                        {velocityAlerts.map(a => (
-                            <p key={a.id} style={{
-                                margin: "5px 0 0", fontSize: "14px", color: "#fff",
-                                fontWeight: a.severity === "CRITICAL" ? 700 : 400
-                            }}>
-                                <span style={{
-                                    color: a.severity === "CRITICAL" ? "#E50914" : "#FFB347",
-                                    marginRight: "8px"
-                                }}>[{a.severity}]</span>
-                                {a.message}
-                            </p>
-                        ))}
-                    </div>
-                </div>
-            )}
+            {/* Vanguard Intelligence Control Center */}
+            <VanguardAlerts range={range} />
 
             {/* ── GLOBAL TIMELINE SELECTOR ────────────────────────────── */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>

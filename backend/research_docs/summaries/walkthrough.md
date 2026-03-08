@@ -314,4 +314,21 @@ The Vanguard AI is no longer just reporting data—it is now performing automate
 
 ---
 
-*SignalShift — The most advanced time-aware review intelligence platform. Built for Enterprise Stability.*
+## Phase 42 — Vanguard Intelligence Alerts (Signal Control Center)
+
+### The Problem: Static & Reactive Alerting
+The existing alerting system was a basic red banner that simply list high-level category spikes. It didn't distinguish between a "normal" increase and a "statistical anomaly," nor did it show how different alerts were related.
+
+### The Solution: Signal Control Center
+We replaced the basic banner with a high-fidelity **Signal Control Center** that acts as the dashboard's cockpit:
+
+1. **Unified Diagnostic Engine:** A new backend endpoint (`/dashboard/intelligence-alerts`) unifies three distinct mathematical signals:
+   - **Bollinger Anomalies:** Flagging issues that have broken their 1.5σ historical threshold.
+   - **MoM Velocity Spikes:** Flagging issues with rapid percentage growth.
+   - **Pearson Correlation Mapping:** Automatically linking alerts (e.g., if "Performance" is spiking, the alert center checks if it's mathematically linked to "Subscription Errors" and surfaces the root-cause link).
+2. **Premium Glassmorphism UI:** A sleek, semi-transparent React component (`VanguardAlerts.jsx`) with a **Live Signal Pulse** animation, creating a "Mission Control" aesthetic.
+3. **Diagnostic Intelligence Cards:** Alerts are now grouped into categorized cards with severity badging (CRITICAL/HIGH/WATCH), making it immediately clear where the fire is versus what is just worth monitoring.
+
+---
+
+*SignalShift — Enterprise-Grade Intelligence for the Modern Product Team.*

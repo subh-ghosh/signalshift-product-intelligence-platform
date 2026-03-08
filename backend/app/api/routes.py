@@ -701,6 +701,109 @@ def velocity_alerts(limit_months: int = 3):
         return []
 
 
+@router.get("/dashboard/intelligence-alerts")
+def get_intelligence_alerts(limit_months: int = 3):
+    """
+    The "Vanguard Signal Center" endpoint.
+    Unifies Anomalies (Bollinger), Velocity (MoM), and Correlations (Pearson)
+    into a single high-priority stream.
+    """
+    try:
+        ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+        all_months = sorted(ts_df["month"].unique())
+        if len(all_months) < 2:
+            return {"alerts": []}
+
+        # 1. Setup Windows
+        curr_months = all_months[-limit_months:]
+        prev_months = all_months[-(limit_months * 2):-limit_months] if len(all_months) >= limit_months * 2 else all_months[:-limit_months]
+        
+        # 2. Compute Velocity & Anomaly Metrics
+        metric_col = "severity_weighted_rate" if "severity_weighted_rate" in ts_df.columns else "normalized_rate" if "normalized_rate" in ts_df.columns else "mentions"
+        
+        curr_stats = ts_df[ts_df["month"].isin(curr_months)].groupby("topic_id")[metric_col].agg(['max', 'sum']).rename(columns={'max': 'curr_rate', 'sum': 'curr_vol'})
+        prev_stats = ts_df[ts_df["month"].isin(prev_months)].groupby("topic_id")[metric_col].agg(['max', 'sum']).rename(columns={'max': 'prev_rate', 'sum': 'prev_vol'}) if prev_months else pd.DataFrame()
+
+        # 3. Correlation Matrix (for top items)
+        top_labels = curr_stats.sort_values("curr_rate", ascending=False).head(5).index.tolist()
+        corr_links = {}
+        if len(top_labels) > 1 and len(all_months) >= 3:
+            pivot_df = ts_df[ts_df["topic_id"].isin(top_labels)].pivot_table(
+                index="month", columns="topic_id", values=metric_col, aggfunc='max'
+            ).fillna(0)
+            if not pivot_df.empty:
+                corr_matrix = pivot_df.corr()
+                for label in top_labels:
+                    if label in corr_matrix.columns:
+                        corrs = corr_matrix[label].drop(label)
+                        strong = corrs[corrs > 0.85]
+                        if not strong.empty:
+                            corr_links[label] = {"linked_to": strong.idxmax(), "score": round(float(strong.max()), 2)}
+
+        alerts = []
+        
+        # 4. Generate Unified Alerts
+        for topic in curr_stats.index:
+            c_rate = curr_stats.loc[topic, "curr_rate"]
+            c_vol = curr_stats.loc[topic, "curr_vol"]
+            
+            # Skip if volume is negligible
+            if c_vol < 5: continue
+            
+            p_rate = prev_stats.loc[topic, "prev_rate"] if topic in prev_stats.index else 0
+            
+            # --- Velocity Signal ---
+            velocity_pct = 0
+            if p_rate > 0:
+                velocity_pct = round(((c_rate - p_rate) / p_rate) * 100, 1)
+            else:
+                velocity_pct = 100 # New issue spike
+            
+            # --- Anomaly Signal (Bollinger) ---
+            topic_ts = ts_df[ts_df["topic_id"] == topic].sort_values("month")
+            is_anomaly = False
+            threshold = 0
+            if len(topic_ts) >= 3:
+                vals = topic_ts[metric_col].values[:-1]
+                mean_val = vals.mean()
+                std_val = vals.std()
+                threshold = mean_val + (1.5 * std_val) if std_val > 0 else mean_val
+                if topic_ts[metric_col].values[-1] > threshold and topic_ts[metric_col].values[-1] > 0.5:
+                    is_anomaly = True
+
+            # Create Alert if Significant
+            if is_anomaly or velocity_pct > 20:
+                severity = "CRITICAL" if (is_anomaly and velocity_pct > 50) else "HIGH" if (is_anomaly or velocity_pct > 30) else "WATCH"
+                
+                # Build Message
+                msg_parts = []
+                if is_anomaly: msg_parts.append(f"Statistically out-of-control (Limit: {threshold:.1f})")
+                if velocity_pct > 20: msg_parts.append(f"MoM spike of +{velocity_pct}%")
+                
+                alert_obj = {
+                    "id": f"int-{topic.lower().replace(' ', '-')[:15]}",
+                    "category": topic,
+                    "type": "ANOMALY" if is_anomaly else "VELOCITY",
+                    "severity": severity,
+                    "message": " | ".join(msg_parts),
+                    "velocity_pct": velocity_pct,
+                    "is_anomaly": is_anomaly,
+                    "link": corr_links.get(topic)
+                }
+                alerts.append(alert_obj)
+
+        # Sort by severity and velocity
+        severity_map = {"CRITICAL": 0, "HIGH": 1, "WATCH": 2}
+        alerts.sort(key=lambda x: (severity_map.get(x["severity"], 3), -x["velocity_pct"]))
+
+        return {"alerts": alerts[:6]} 
+
+    except Exception as e:
+        print(f"[intelligence-alerts] error: {e}")
+        return {"alerts": []}
+
+
+
 # -----------------------------
 # KPI SUMMARY
 # -----------------------------
