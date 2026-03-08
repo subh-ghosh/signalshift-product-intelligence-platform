@@ -1,8 +1,28 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 
-// Single KPI metric card
-function KpiCard({ label, value, sub, color = "#fff", icon }) {
+// Delta badge: shows +12% ↑ or -5% ↓
+function DeltaBadge({ delta, isPercent = true }) {
+    if (delta === null || delta === undefined) return null
+    const up = delta > 0
+    const color = up ? "#1DB954" : "#E50914"
+    const arrow = up ? "↑" : "↓"
+    const abs = Math.abs(delta)
+    return (
+        <span style={{
+            fontSize: "11px", fontWeight: 700, padding: "2px 7px",
+            borderRadius: "12px", background: `${color}22`,
+            border: `1px solid ${color}44`, color,
+            display: "inline-flex", alignItems: "center", gap: "3px",
+            marginTop: "4px", whiteSpace: "nowrap"
+        }}>
+            {arrow} {up ? "+" : "−"}{abs}{isPercent ? "%" : ""}
+        </span>
+    )
+}
+
+// Single KPI metric card with optional delta
+function KpiCard({ label, value, sub, color = "#fff", icon, delta, deltaIsPercent = true }) {
     return (
         <div style={{
             flex: 1,
@@ -13,7 +33,7 @@ function KpiCard({ label, value, sub, color = "#fff", icon }) {
             padding: "20px 24px",
             display: "flex",
             flexDirection: "column",
-            gap: "6px"
+            gap: "4px"
         }}>
             <div style={{ fontSize: "22px" }}>{icon}</div>
             <div style={{ fontSize: "28px", fontWeight: 800, color, letterSpacing: "-0.5px" }}>
@@ -21,6 +41,7 @@ function KpiCard({ label, value, sub, color = "#fff", icon }) {
             </div>
             <div style={{ fontSize: "13px", fontWeight: 600, color: "#ccc" }}>{label}</div>
             {sub && <div style={{ fontSize: "11px", color: "#555" }}>{sub}</div>}
+            <DeltaBadge delta={delta} isPercent={deltaIsPercent} />
         </div>
     )
 }
@@ -41,6 +62,7 @@ export default function KpiBar({ limitMonths = 0 }) {
 
     const sentimentColor = kpis.positive_pct >= 60 ? "#1DB954" : kpis.positive_pct >= 40 ? "#FFB347" : "#E50914"
     const ratingColor = kpis.avg_rating >= 3.5 ? "#1DB954" : kpis.avg_rating >= 2.5 ? "#FFB347" : "#E50914"
+    const d = kpis.deltas || {}
 
     return (
         <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "32px" }}>
@@ -50,13 +72,17 @@ export default function KpiBar({ limitMonths = 0 }) {
                 value={kpis.total_reviews.toLocaleString()}
                 sub={kpis.window}
                 color="#fff"
+                delta={d.reviews}
+                deltaIsPercent={true}
             />
             <KpiCard
                 icon="⭐"
                 label="Avg Rating"
                 value={kpis.avg_rating ? `${kpis.avg_rating}/5.0` : "N/A"}
-                sub="from review scores"
+                sub="vs. previous period"
                 color={ratingColor}
+                delta={d.rating}
+                deltaIsPercent={false}
             />
             <KpiCard
                 icon="😊"
@@ -64,6 +90,8 @@ export default function KpiBar({ limitMonths = 0 }) {
                 value={`${kpis.positive_pct}%`}
                 sub={`${(100 - kpis.positive_pct).toFixed(1)}% negative`}
                 color={sentimentColor}
+                delta={d.positive_pct}
+                deltaIsPercent={false}
             />
             <KpiCard
                 icon="🔴"
@@ -71,6 +99,8 @@ export default function KpiBar({ limitMonths = 0 }) {
                 value={kpis.active_issues}
                 sub="canonical categories"
                 color={kpis.active_issues > 8 ? "#E50914" : "#FFB347"}
+                delta={d.active_issues}
+                deltaIsPercent={false}
             />
         </div>
     )

@@ -23,6 +23,7 @@ function severityColor(sev) {
 function CustomTooltip({ active, payload }) {
   if (!active || !payload || !payload.length) return null
   const d = payload[0].payload
+  const velColor = d.velocity_dir === "up" ? "#1DB954" : d.velocity_dir === "down" ? "#E50914" : d.velocity_dir === "new" ? "#00B4D8" : "#888"
   return (
     <div style={{
       background: "rgba(18,18,18,0.95)",
@@ -33,10 +34,16 @@ function CustomTooltip({ active, payload }) {
       color: "#fff",
       maxWidth: "260px"
     }}>
-      <div style={{ fontWeight: 700, marginBottom: 6, color: "#fff" }}>{d.issue}</div>
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>{d.issue}</div>
       <div style={{ color: "#aaa" }}>
         Mentions: <span style={{ color: "#fff", fontWeight: 600 }}>{d.mentions.toLocaleString()}</span>
       </div>
+      {d.velocity_label && (
+        <div style={{ color: velColor, fontWeight: 700, marginTop: 4, fontSize: "12px" }}>
+          {d.velocity_dir === "up" ? "↑" : d.velocity_dir === "down" ? "↓" : "★"}{" "}
+          {d.velocity_label} vs. prev period
+        </div>
+      )}
       {d.avg_severity > 0 && (
         <div style={{ color: "#aaa", marginTop: 4 }}>
           Avg Severity:&nbsp;
@@ -49,6 +56,27 @@ function CustomTooltip({ active, payload }) {
     </div>
   )
 }
+
+// Custom Y-axis tick that renders the issue label + velocity arrow
+function VelocityTick({ x, y, payload, data }) {
+  const issue = data.find(d => d.issue === payload.value)
+  const dir = issue?.velocity_dir
+  const lbl = issue?.velocity_label
+  const arrow = dir === "up" ? "↑" : dir === "down" ? "↓" : dir === "new" ? "★" : ""
+  const arrowColor = dir === "up" ? "#1DB954" : dir === "down" ? "#E50914" : dir === "new" ? "#00B4D8" : "transparent"
+  const shortName = payload.value.length > 22 ? payload.value.slice(0, 21) + "…" : payload.value
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={-8} y={0} dy={4} textAnchor="end" fill="#ccc" fontSize={12}>{shortName}</text>
+      {arrow && (
+        <text x={-8 + (shortName.length * 7 * -1) - 6} y={0} dy={4} textAnchor="end" fill={arrowColor} fontSize={11} fontWeight={800}>
+          {arrow}
+        </text>
+      )}
+    </g>
+  )
+}
+
 
 export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
   const [data, setData] = useState([])
@@ -100,8 +128,8 @@ export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
           <YAxis
             type="category"
             dataKey="issue"
-            width={230}
-            tick={{ fill: "#ccc", fontSize: 12 }}
+            width={240}
+            tick={<VelocityTick data={data} />}
             axisLine={false}
             tickLine={false}
           />

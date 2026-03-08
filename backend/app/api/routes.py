@@ -133,26 +133,34 @@ def top_issues(limit_months: int = 0):
     try:
         topic_df = pd.read_csv("data/processed/topic_analysis.csv")
 
-        # Detect the label column: Phase 24+ uses 'label', fallback to 'topic_id' or first col
+        # Detect the label column
         if "label" in topic_df.columns:
             label_col_ta = "label"
         elif "topic_id" in topic_df.columns:
             label_col_ta = "topic_id"
         else:
-            label_col_ta = topic_df.columns[0]  # first column is the canonical label
+            label_col_ta = topic_df.columns[0]
 
-        # When a time window is selected, recalculate mentions from timeseries
+        curr_mentions_map = {}
+        prev_mentions_map = {}
+
         if limit_months > 0:
             try:
                 ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
                 all_months = sorted(ts_df["month"].unique())
-                target_months = all_months[-limit_months:]
-                ts_filtered = ts_df[ts_df["month"].isin(target_months)]
+                curr_months = all_months[-limit_months:]
+                prev_months = all_months[-(limit_months * 2):-limit_months] if len(all_months) >= limit_months * 2 else []
 
-                # topic_timeseries always has topic_id column
-                windowed = ts_filtered.groupby("topic_id")["mentions"].sum().reset_index()
+                curr_win = ts_df[ts_df["month"].isin(curr_months)].groupby("topic_id")["mentions"].sum()
+                curr_mentions_map = curr_win.to_dict()
+
+                if prev_months:
+                    prev_win = ts_df[ts_df["month"].isin(prev_months)].groupby("topic_id")["mentions"].sum()
+                    prev_mentions_map = prev_win.to_dict()
+
+                # Apply windowed counts to topic_df
+                windowed = curr_win.reset_index()
                 windowed.columns = [label_col_ta, "windowed_mentions"]
-
                 topic_df = topic_df.merge(windowed, on=label_col_ta, how="left")
                 topic_df["mentions"] = topic_df["windowed_mentions"].fillna(0).astype(int)
                 topic_df = topic_df.drop(columns=["windowed_mentions"], errors="ignore")
@@ -166,18 +174,36 @@ def top_issues(limit_months: int = 0):
             mentions = int(row["mentions"])
             if mentions == 0:
                 continue
+
+            # Compute velocity vs previous period
+            velocity = None
+            velocity_dir = "same"
+            velocity_label = ""
+            if limit_months > 0 and prev_mentions_map:
+                prev = prev_mentions_map.get(label, 0)
+                if prev > 0:
+                    pct = round(((mentions - prev) / prev) * 100, 1)
+                    velocity = pct
+                    velocity_dir = "up" if pct > 5 else "down" if pct < -5 else "same"
+                    sign = "+" if pct > 0 else ""
+                    velocity_label = f"{sign}{pct}%"
+                elif mentions > 0:
+                    velocity_dir = "new"
+                    velocity_label = "NEW"
+
             issues.append({
                 "issue": label,
                 "keywords": label,
                 "mentions": mentions,
-                "avg_severity": round(float(row.get("avg_severity", 0.0)), 2)
+                "avg_severity": round(float(row.get("avg_severity", 0.0)), 2),
+                "velocity": velocity,
+                "velocity_dir": velocity_dir,
+                "velocity_label": velocity_label
             })
             if len(issues) >= 10:
                 break
         return issues
     except FileNotFoundError:
-        return []
-
         return []
 
 
@@ -379,41 +405,74 @@ def reviews():
 
 @router.get("/dashboard/kpis")
 def dashboard_kpis(limit_months: int = 0):
-    """Returns key metrics for the selected time window: total reviews, avg rating, positive %, active issues."""
+    """Returns key metrics with period-over-period deltas for the selected time window."""
     try:
-        df = get_dashboard_dataset()
-        if limit_months > 0 and "at" in df.columns:
-            df["at"] = pd.to_datetime(df["at"], errors="coerce")
-            cutoff = pd.Timestamp.now() - pd.DateOffset(months=limit_months)
-            df = df[df["at"] >= cutoff]
+        full_df = get_dashboard_dataset()
+        has_dates = limit_months > 0 and "at" in full_df.columns
 
-        total = len(df)
-        avg_rating = round(float(df["score"].mean()), 2) if "score" in df.columns else None
-        positive = int((df["sentiment"] == "positive").sum()) if "sentiment" in df.columns else 0
-        positive_pct = round((positive / total) * 100, 1) if total > 0 else 0
+        def compute_metrics(df):
+            total = len(df)
+            avg_rating = round(float(df["score"].mean()), 2) if "score" in df.columns and total > 0 else None
+            positive = int((df["sentiment"] == "positive").sum()) if "sentiment" in df.columns else 0
+            positive_pct = round((positive / total) * 100, 1) if total > 0 else 0
+            return total, avg_rating, positive_pct
 
-        # Active issue count from timeseries within window
-        active_issues = 0
+        if has_dates:
+            full_df["at"] = pd.to_datetime(full_df["at"], errors="coerce")
+            now = pd.Timestamp.now()
+            curr_cutoff = now - pd.DateOffset(months=limit_months)
+            prev_cutoff = now - pd.DateOffset(months=limit_months * 2)
+            curr_df = full_df[full_df["at"] >= curr_cutoff]
+            prev_df = full_df[(full_df["at"] >= prev_cutoff) & (full_df["at"] < curr_cutoff)]
+        else:
+            curr_df = full_df
+            prev_df = pd.DataFrame()
+
+        total, avg_rating, positive_pct = compute_metrics(curr_df)
+        prev_total, prev_rating, prev_pos_pct = compute_metrics(prev_df) if not prev_df.empty else (None, None, None)
+
+        def delta(curr, prev):
+            if prev is None or prev == 0: return None
+            return round(curr - prev, 2) if isinstance(curr, float) else curr - prev
+
+        def pct_delta(curr, prev):
+            if prev is None or prev == 0: return None
+            return round(((curr - prev) / prev) * 100, 1)
+
+        # Active issues from timeseries
+        active_issues, prev_active = 0, None
         try:
             ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+            all_months = sorted(ts_df["month"].unique())
             if limit_months > 0:
-                all_months = sorted(ts_df["month"].unique())
-                target = all_months[-limit_months:]
-                ts_df = ts_df[ts_df["month"].isin(target)]
-            active_issues = int(ts_df.groupby("issue_label")["mentions"].sum().gt(0).sum())
+                curr_months = all_months[-limit_months:]
+                prev_months = all_months[-(limit_months * 2):-limit_months] if len(all_months) >= limit_months * 2 else []
+                active_issues = int(ts_df[ts_df["month"].isin(curr_months)].groupby("issue_label")["mentions"].sum().gt(0).sum())
+                if prev_months:
+                    prev_active = int(ts_df[ts_df["month"].isin(prev_months)].groupby("issue_label")["mentions"].sum().gt(0).sum())
+            else:
+                active_issues = int(ts_df.groupby("issue_label")["mentions"].sum().gt(0).sum())
         except Exception:
             pass
+
+        has_prev = prev_total and prev_total > 0
 
         return {
             "total_reviews": total,
             "avg_rating": avg_rating,
             "positive_pct": positive_pct,
             "active_issues": active_issues,
-            "window": f"Last {limit_months}M" if limit_months > 0 else "All Time"
+            "window": f"Last {limit_months}M" if limit_months > 0 else "All Time",
+            "deltas": {
+                "reviews": pct_delta(total, prev_total) if has_prev else None,
+                "rating": delta(avg_rating, prev_rating) if has_prev and avg_rating and prev_rating else None,
+                "positive_pct": delta(positive_pct, prev_pos_pct) if has_prev else None,
+                "active_issues": delta(active_issues, prev_active) if prev_active is not None else None,
+            } if has_dates else None
         }
     except Exception as e:
         print(f"[kpis] error: {e}")
-        return {"total_reviews": 0, "avg_rating": None, "positive_pct": 0, "active_issues": 0}
+        return {"total_reviews": 0, "avg_rating": None, "positive_pct": 0, "active_issues": 0, "deltas": None}
 
 
 # -----------------------------
