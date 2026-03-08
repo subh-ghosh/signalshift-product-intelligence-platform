@@ -379,18 +379,45 @@ export default function Dashboard() {
                     <p style={{ fontSize: "13px", color: "#888", marginBottom: "15px" }}>
                         Curated feedback filtered for detail, uniqueness, and business impact.
                     </p>
-                    <div style={{ maxHeight: "400px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
-                        {reviews.map((r, i) => (
-                            <div key={i} style={{
-                                padding: "15px",
-                                background: "rgba(255,255,255,0.03)",
-                                borderRadius: "8px",
-                                fontSize: "14px",
-                                borderLeft: "3px solid #E50914"
-                            }}>
-                                "{highlightEntities(r, issueKeywords)}"
-                            </div>
-                        ))}
+                    <div style={{ maxHeight: "450px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+                        {reviews.map((r, i) => {
+                            const text = typeof r === "object" ? r.text : r
+                            const date = typeof r === "object" ? r.date : ""
+                            return (
+                                <div key={i} style={{
+                                    padding: "15px 18px",
+                                    background: "rgba(255,255,255,0.03)",
+                                    borderRadius: "10px",
+                                    fontSize: "14px",
+                                    borderLeft: "3px solid #E50914",
+                                    lineHeight: "1.6"
+                                }}>
+                                    <div>
+                                        "{highlightEntities(text, issueKeywords)}"
+                                    </div>
+                                    {date && (
+                                        <div style={{
+                                            marginTop: "10px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "6px"
+                                        }}>
+                                            <span style={{
+                                                fontSize: "11px",
+                                                color: "#555",
+                                                background: "rgba(255,255,255,0.05)",
+                                                border: "1px solid rgba(255,255,255,0.08)",
+                                                borderRadius: "20px",
+                                                padding: "2px 10px",
+                                                letterSpacing: "0.03em"
+                                            }}>
+                                                📅 {date}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
             )}

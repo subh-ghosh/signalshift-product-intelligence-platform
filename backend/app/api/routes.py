@@ -276,15 +276,17 @@ async def export_report(limit_months: int = 0):
 # -----------------------------
 
 @router.get("/dashboard/issue-reviews")
-def issue_reviews(issue: str):
+def issue_reviews(issue: str, limit_months: int = 0):
     import ast
     try:
         topic_df = pd.read_csv("data/processed/topic_analysis.csv")
+        label_col = "label" if "label" in topic_df.columns else (
+            "topic_id" if "topic_id" in topic_df.columns else topic_df.columns[0]
+        )
         matching_reviews = []
         matched_label = issue
         for _, row in topic_df.iterrows():
-            # Phase 24+: label column is already canonical
-            label = str(row.get("label", row.get("keywords", "")))
+            label = str(row.get(label_col, row.get("keywords", "")))
             if label.strip() == issue.strip():
                 try:
                     matching_reviews = ast.literal_eval(row["sample_reviews"])
@@ -293,10 +295,39 @@ def issue_reviews(issue: str):
                     matching_reviews = [r.strip(" '\"\n") for r in rev_string.split("', '") if r.strip()]
                 matched_label = label
                 break
+
+        matching_reviews = [r for r in matching_reviews if len(str(r)) > 20][:20]
+
+        # Build text → date lookup from raw reviews file
+        date_lookup = {}
+        for raw_path in ["data/raw/netflix_reviews.csv", "data/processed/uploaded_reviews.csv"]:
+            if os.path.exists(raw_path):
+                try:
+                    raw_df = pd.read_csv(raw_path)
+                    text_col = next((c for c in ["content", "review", "text"] if c in raw_df.columns), None)
+                    date_col = next((c for c in ["at", "date"] if c in raw_df.columns), None)
+                    if text_col and date_col:
+                        raw_df[date_col] = pd.to_datetime(raw_df[date_col], errors="coerce")
+                        for _, r in raw_df.dropna(subset=[date_col]).iterrows():
+                            key = str(r[text_col]).strip()[:120]
+                            if key not in date_lookup:
+                                date_lookup[key] = r[date_col].strftime("%d %b %Y")
+                    break
+                except Exception as e:
+                    print(f"[issue-reviews] date lookup error: {e}")
+
+        reviews_with_dates = []
+        for rev in matching_reviews:
+            rev_str = str(rev).strip()
+            reviews_with_dates.append({
+                "text": rev_str,
+                "date": date_lookup.get(rev_str[:120], "")
+            })
+
         return {
             "issue": issue,
             "keywords": matched_label,
-            "reviews": [r for r in matching_reviews if len(str(r)) > 20][:20]
+            "reviews": reviews_with_dates
         }
     except FileNotFoundError:
         return {"issue": issue, "keywords": "", "reviews": []}
