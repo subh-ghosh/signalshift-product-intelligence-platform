@@ -1,9 +1,9 @@
 import {
-    Radar, 
-    RadarChart, 
-    PolarGrid, 
-    PolarAngleAxis, 
-    PolarRadiusAxis, 
+    Radar,
+    RadarChart,
+    PolarGrid,
+    PolarAngleAxis,
+    PolarRadiusAxis,
     ResponsiveContainer,
     Tooltip
 } from 'recharts';
@@ -32,29 +32,56 @@ export default function AspectRadarChart({ limitMonths = 0 }) {
     }, [limitMonths]);
 
     if (loading) return <SkeletonChart height={300} />;
-    if (data.length === 0) return <p style={{ textAlign: 'center', color: '#666' }}>No aspect data available yet.</p>;
+
+    if (data.length === 0) return (
+        <p style={{ textAlign: 'center', color: '#64748B', padding: "40px 0" }}>
+            No aspect data available yet.
+        </p>
+    );
 
     return (
-        <div style={{ width: "100%", height: 400, background: 'rgba(255,255,255,0.02)', borderRadius: '15px', padding: '20px' }}>
-            <ResponsiveContainer>
-                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
-                    <PolarGrid stroke="#444" />
-                    <PolarAngleAxis dataKey="aspect" tick={{ fill: '#E50914', fontSize: 12 }} />
-                    <PolarRadiusAxis stroke="#666" />
+        <div style={{ width: "100%", height: "100%", minHeight: 320, display: "flex", flexDirection: "column" }}>
+            <ResponsiveContainer width="100%" height={280}>
+                <RadarChart cx="50%" cy="50%" outerRadius="75%" data={data}>
+                    {/* Light, subtle grid lines */}
+                    <PolarGrid stroke="#E2E8F0" />
+
+                    {/* Clean slate text for the categories */}
+                    <PolarAngleAxis
+                        dataKey="aspect"
+                        tick={{ fill: '#475569', fontSize: 11, fontWeight: 600 }}
+                    />
+
+                    <PolarRadiusAxis axisLine={false} tick={false} />
+
+                    {/* Professional Blue Radar Polygon */}
                     <Radar
                         name="Mentions"
                         dataKey="mentions"
-                        stroke="#E50914"
-                        fill="#E50914"
-                        fillOpacity={0.6}
+                        stroke="#3B82F6"
+                        strokeWidth={2}
+                        fill="#3B82F6"
+                        fillOpacity={0.15}
                     />
-                    <Tooltip 
-                        contentStyle={{ backgroundColor: '#141414', border: '1px solid #444', color: '#fff' }}
+
+                    {/* Clean Light Theme Tooltip */}
+                    <Tooltip
+                        contentStyle={{
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #E2E8F0',
+                            color: '#0F172A',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                            fontWeight: 600,
+                            fontSize: '13px'
+                        }}
+                        itemStyle={{ color: '#3B82F6', fontWeight: 700 }}
                     />
                 </RadarChart>
             </ResponsiveContainer>
-            <p style={{ textAlign: 'center', fontSize: '12px', color: '#888', marginTop: '10px' }}>
-                AI-Detected Business Categories (ABSA)
+
+            <p style={{ textAlign: 'center', fontSize: '12px', color: '#94A3B8', marginTop: 'auto', paddingTop: '16px' }}>
+                Detected Business Categories
             </p>
         </div>
     );

@@ -1,10 +1,12 @@
 :root {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.6;
   font-weight: 400;
 
-  color: #E5E5E5;
-  background-color: #000000;
+  color: #1E293B;
+  /* Dark Slate for readable text */
+  background-color: #F4F7FE;
+  /* Signature minimal light gray/blue background */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -15,68 +17,111 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at top right, #1a1a1a, #000000);
+  background: #F4F7FE;
 }
 
-h1, h2, h3 {
-  color: #FFFFFF;
+h1,
+h2,
+h3,
+h4 {
+  color: #111827;
   letter-spacing: -0.02em;
+  margin-top: 0;
 }
 
 h1 {
-  font-size: 2.5rem;
+  font-size: 1.8rem;
   font-weight: 800;
-  background: linear-gradient(to right, #E50914, #ff4d4d);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 button {
-  border-radius: 4px;
+  border-radius: 12px;
   border: none;
   padding: 10px 24px;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  transition: all 0.2s ease;
+  letter-spacing: 0.02em;
 }
 
+/* Updated to a Netflix Red accent for the main buttons */
 .btn-primary {
-  background-color: #E50914;
+  background: #E50914;
   color: white;
+  box-shadow: 0 4px 14px rgba(229, 9, 20, 0.25);
 }
 
 .btn-primary:hover {
-  background-color: #ff0f1e;
-  transform: scale(1.02);
-  box-shadow: 0 0 20px rgba(229, 9, 20, 0.4);
+  background: #F40612;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(229, 9, 20, 0.35);
 }
 
+.btn-secondary {
+  background: #FFFFFF;
+  color: #1E293B;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.btn-secondary:hover {
+  background: #F8FAFC;
+  transform: translateY(-2px);
+}
+
+/* Reusing the glass-card class name so we don't break your components, 
+   but fundamentally changing it to the clean, white Tesla-style card */
 .glass-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: #FFFFFF;
+  border: none;
+  border-radius: 24px;
+  /* Much softer, rounder corners */
   padding: 24px;
-  transition: border-color 0.3s ease;
+  transition: all 0.3s ease;
+  /* Ultra-soft, widespread shadow characteristic of modern light UI */
+  box-shadow: 0px 10px 30px rgba(17, 12, 46, 0.04);
 }
 
 .glass-card:hover {
-  border-color: rgba(229, 9, 20, 0.3);
+  box-shadow: 0px 15px 35px rgba(17, 12, 46, 0.08);
+  transform: translateY(-2px);
 }
 
-input[type="file"] {
-  color: #888;
-  font-size: 0.9rem;
+/* 3D Netflix Logo Style (as requested) */
+.logo-3d {
+  background: linear-gradient(135deg, #FF0A16, #B20710);
+  color: white;
+  border-radius: 10px;
+  padding: 6px 14px;
+  font-weight: 900;
+  font-size: 1.2rem;
+  letter-spacing: 3px;
+  display: inline-block;
+  /* Multi-layered shadow for that embossed, 3D pop */
+  box-shadow:
+    inset 2px 2px 4px rgba(255, 255, 255, 0.4),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.2),
+    0 6px 12px rgba(229, 9, 20, 0.3);
+  text-transform: uppercase;
 }
 
-hr {
-  border: 0;
-  height: 1px;
-  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
-  margin: 40px 0;
+/* Scrollbar styling for light theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }

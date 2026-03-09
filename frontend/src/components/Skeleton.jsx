@@ -1,17 +1,16 @@
 import { useEffect, useState, useRef } from "react"
 
-// Animated shimmer skeleton for loading states
-// Usage: <Skeleton width="100%" height={20} />  or  <Skeleton lines={3} />
-
+// Clean Light Theme animated shimmer for loading states
 function SkeletonBlock({ width = "100%", height = 16, borderRadius = 6, style = {} }) {
     return (
         <div style={{
             width,
             height,
             borderRadius,
-            background: "linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 75%)",
+            // Soft light-gray slate gradient
+            background: "linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%)",
             backgroundSize: "200% 100%",
-            animation: "shimmer 1.6s infinite",
+            animation: "shimmer 1.5s infinite linear",
             ...style
         }} />
     )
@@ -20,7 +19,7 @@ function SkeletonBlock({ width = "100%", height = 16, borderRadius = 6, style = 
 // Multi-line text skeleton
 export function SkeletonText({ lines = 3, lastLineWidth = "70%" }) {
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {Array.from({ length: lines }).map((_, i) => (
                 <SkeletonBlock key={i} width={i === lines - 1 ? lastLineWidth : "100%"} height={14} />
             ))}
@@ -28,22 +27,37 @@ export function SkeletonText({ lines = 3, lastLineWidth = "70%" }) {
     )
 }
 
-// KPI bar skeleton (4 cards)
+// KPI bar skeleton (4 cards) updated to match the new vertical Light Theme layout
 export function SkeletonKpiBar() {
     return (
-        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "32px" }}>
+        <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: "24px",
+            marginBottom: "32px",
+            width: "100%"
+        }}>
             {[1, 2, 3, 4].map(i => (
-                <div key={i} style={{
-                    flex: 1, minWidth: "140px",
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    borderRadius: "12px", padding: "20px 24px",
-                    display: "flex", flexDirection: "column", gap: "10px"
+                <div key={i} className="glass-card" style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    padding: "24px",
+                    gap: "12px"
                 }}>
-                    <SkeletonBlock width={32} height={32} borderRadius={8} />
-                    <SkeletonBlock width="60%" height={28} />
-                    <SkeletonBlock width="80%" height={13} />
-                    <SkeletonBlock width="50%" height={11} />
+                    {/* Top Row: Label and Icon */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <SkeletonBlock width="45%" height={16} />
+                        <SkeletonBlock width={36} height={36} borderRadius={10} />
+                    </div>
+
+                    {/* Middle Row: Primary Value */}
+                    <SkeletonBlock width="60%" height={32} style={{ marginTop: "4px" }} />
+
+                    {/* Bottom Row: Delta & Subtext */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px" }}>
+                        <SkeletonBlock width="25%" height={24} borderRadius={6} />
+                        <SkeletonBlock width="40%" height={12} />
+                    </div>
                 </div>
             ))}
         </div>
@@ -53,9 +67,9 @@ export function SkeletonKpiBar() {
 // Chart card skeleton
 export function SkeletonChart({ height = 300 }) {
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <SkeletonBlock width="40%" height={20} />
-            <SkeletonBlock width="100%" height={height} borderRadius={8} />
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <SkeletonBlock width="35%" height={22} />
+            <SkeletonBlock width="100%" height={height} borderRadius={12} />
         </div>
     )
 }
@@ -63,8 +77,8 @@ export function SkeletonChart({ height = 300 }) {
 // Card with lines skeleton
 export function SkeletonCard({ lines = 4 }) {
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <SkeletonBlock width="50%" height={20} />
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <SkeletonBlock width="40%" height={22} />
             <SkeletonText lines={lines} />
         </div>
     )

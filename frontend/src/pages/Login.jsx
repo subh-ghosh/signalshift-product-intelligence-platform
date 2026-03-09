@@ -32,7 +32,7 @@ export default function Login() {
             <div className="glass-card" style={{ width: '400px', padding: '40px' }}>
                 <h2 style={{ fontSize: '24px', marginBottom: '10px' }}>Manager Access</h2>
                 <p style={{ color: '#888', fontSize: '14px', marginBottom: '30px' }}>
-                    Enter credentials to access private data intelligence.
+                    Enter credentials to access private customer insights.
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

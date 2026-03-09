@@ -14,6 +14,35 @@ from app.ml.issue_labeler import generate_issue_label
 
 
 class MLService:
+    def semantic_search(self, query: str, reviews: list[str], top_n: int = 15):
+        """Perform semantic search across a list of reviews using the internal encoder."""
+        if not reviews:
+            return []
+            
+        print(f"[Vanguard X-Ray] Searching for: {query}")
+        # Encode the query
+        query_emb = self.encoder.encode([query], normalize_embeddings=True)
+        
+        # Encode the reviews in batches for speed
+        # For a truly elite experience, these would be indexed, but on-the-fly works for medium datasets
+        review_embs = self.encoder.encode(
+            reviews, batch_size=64, normalize_embeddings=True, show_progress_bar=False
+        )
+        
+        # Compute cosine similarity
+        similarities = np.dot(review_embs, query_emb.T).flatten()
+        
+        # Get top N
+        top_indices = np.argsort(similarities)[-top_n:][::-1]
+        
+        results = []
+        for idx in top_indices:
+            results.append({
+                "content": reviews[idx],
+                "confidence": float(similarities[idx])
+            })
+            
+        return results
 
     def __init__(self):
 
@@ -270,7 +299,11 @@ class MLService:
         if date_col:
             dates = pd.to_datetime(valid_df[date_col], errors="coerce").dt.to_period("M").astype(str).tolist()
         else:
-            dates = ["Unknown"] * len(reviews)
+            dates = ["Recent"] * len(valid_df)
+
+        # Phase 64: High-Detail Metadata Extraction
+        versions = valid_df["appVersion"].astype(str).tolist() if "appVersion" in valid_df.columns else ["Build N/A"] * len(valid_df)
+        upvotes = valid_df["thumbsUpCount"].fillna(0).astype(int).tolist() if "thumbsUpCount" in valid_df.columns else [0] * len(valid_df)
             
         filtered_out = total_negative - len(reviews)
         total_valid = len(reviews)
@@ -304,6 +337,63 @@ class MLService:
         taxonomy_matrix = il_module._taxonomy_embeddings  # (n_cats, 384)
         taxonomy_labels = il_module._taxonomy_labels       # list[str]
         CONFIDENCE_THRESHOLD = 0.30  # Reviews below this → General App Feedback
+
+        # ── PHASE 53: REVENUE RISK INTELLIGENCE ─────────────────────────────
+        TIER_WEIGHTS = {
+            "enterprise": 5.0,
+            "premium": 4.0,
+            "pro": 2.5,
+            "standard": 1.0,
+            "free": 0.8
+        }
+
+        def compute_value_weight(row: pd.Series) -> float:
+            """Calculates a financial multiplier based on customer tier/value."""
+            # Use lowercase column names for matching
+            cols = {c.lower(): c for c in row.index}
+            
+            weight = 1.0
+            # Tier weighting
+            tier_col = next((cols[k] for k in ["user_tier", "tier", "segment"] if k in cols), None)
+            if tier_col:
+                val = str(row[tier_col]).lower()
+                weight = TIER_WEIGHTS.get(val, 1.0)
+            
+            # Direct CLV weighting (if available)
+            clv_col = next((cols[k] for k in ["clv", "value", "revenue"] if k in cols), None)
+            if clv_col and pd.notnull(row[clv_col]):
+                try:
+                    clv_val = float(row[clv_col])
+                    if clv_val > 0: weight *= (1.0 + np.log1p(clv_val / 100))
+                except: pass
+            return round(weight, 2)
+
+        # ── PHASE 59: ACTIONABILITY LEXICONS & LOGIC ────────────────────────
+        ACTIONABLE_SIGNAL_WORDS = {
+            "button", "click", "screen", "load", "slow", "crash", "bug", "stuck", 
+            "error", "missing", "broken", "freeze", "freezing", "login", "password",
+            "payment", "subscribe", "subscription", "feature", "add", "improve",
+            "update", "version", "menu", "tab", "setting", "notification"
+        }
+        VENTING_ONLY_WORDS = {"stupid", "bad", "worst", "hate", "dumb", "useless", "garbage", "trash", "why"}
+
+        def compute_actionability(text: str) -> float:
+            """Returns an actionability score 0.0-1.0 (signal-to-noise)."""
+            t = text.lower()
+            words = set(t.split())
+            if not words: return 0.0
+            
+            signal_count = len(words & ACTIONABLE_SIGNAL_WORDS)
+            vent_count = len(words & VENTING_ONLY_WORDS)
+            
+            # Actionability is high if specific signal words exist, low if mostly venting
+            base_score = min(signal_count * 0.3, 0.9)
+            penalty = min(vent_count * 0.1, 0.4)
+            
+            # Bonus for specific detail lengths
+            if 50 < len(text) < 300: base_score += 0.1
+            
+            return max(0.0, min(1.0, round(base_score - penalty, 2)))
 
         # ── PHASE 26: SEVERITY SCORING LEXICONS ─────────────────────────────
         SEVERITY_5_WORDS = {"scam", "fraud", "lawsuit", "legal", "stolen", "robbed", "cheat", "criminal", "hack", "hacked"}
@@ -371,6 +461,7 @@ class MLService:
                             "mentions": 0,
                             "severity_total": 0.0,   # Phase 26
                             "severity_count": 0,      # Phase 26
+                            "actionability_total": 0.0, # Phase 59
                             "monthly_mentions": {},
                             "monthly_texts": {},
                             "low_conf_reviews": [],   # Phase 27: bucket for anomaly detection
@@ -384,11 +475,18 @@ class MLService:
                     topic_stats[canonical_label]["severity_total"] += sev
                     topic_stats[canonical_label]["severity_count"] += 1
 
+                    # Phase 59: Accumulate actionability
+                    act = compute_actionability(batch_reviews[j])
+                    topic_stats[canonical_label]["actionability_total"] += act
+
                     # Phase 27: Collect low-confidence reviews for anomaly detection
                     if confidence < CONFIDENCE_THRESHOLD and len(
                         topic_stats[canonical_label]["low_conf_reviews"]
-                    ) < 200:
-                        topic_stats[canonical_label]["low_conf_reviews"].append(batch_reviews[j])
+                    ) < 300: # Increased pool for better temporal resolution
+                        topic_stats[canonical_label]["low_conf_reviews"].append({
+                            "text": batch_reviews[j],
+                            "month": month_str
+                        })
 
                     # Track timeseries (Phase 16) — keyed by canonical label
                     month_str = batch_dates[j]
@@ -416,14 +514,23 @@ class MLService:
                         elif confidence > heap[0][0]:
                             heapq.heapreplace(heap, (confidence, review_text))
 
-                    # ── PHASE 31: Record per-review classification with date ──
+                    # ── PHASE 53: REVENUE RISK INTELLIGENCE ──────────────
+                    vw = compute_value_weight(valid_df.iloc[i + j])
+                    sev = compute_severity(batch_reviews[j])
+                    financial_impact = sev * vw
+                    
+                    # ── Diagnostic Recording ─────────────────────────────
                     if len(review_text) > 20:
                         review_classifications.append({
                             "text": review_text,
                             "category": canonical_label,
                             "date":  month_str if month_str != "NaT" else "",
                             "severity": sev,
-                            "confidence": round(float(confidence), 4)
+                            "value_weight": vw,
+                            "financial_impact": round(financial_impact, 2),
+                            "confidence": round(float(confidence), 4),
+                            "app_version": versions[i + j],
+                            "upvotes": upvotes[i + j]
                         })
 
             except Exception as e:
@@ -507,35 +614,86 @@ class MLService:
         # to discover potential new issue types not in our taxonomy.
         print("[Phase 27] Scanning for emerging issues in low-confidence reviews...")
         try:
-            all_low_conf = []
-            for data in topic_stats.values():
-                all_low_conf.extend(data.get("low_conf_reviews", []))
+            all_low_conf_data = [] # List of dicts {text, month}
+            for topic_data in topic_stats.values():
+                all_low_conf_data.extend(topic_data.get("low_conf_reviews", []))
 
-            MIN_EMERGING = 20  # Need at least 20 reviews to surface an emerging issue
-            if len(all_low_conf) >= MIN_EMERGING:
+            MIN_EMERGING = 20
+            if len(all_low_conf_data) >= MIN_EMERGING:
                 from sklearn.decomposition import NMF as _NMF
+                # Phase 60: Filter for actionable signals inside the General bucket before clustering
+                # This ensures we find Proto-Issues (bugs/features), not just Proto-Noise (venting).
+                actionable_low_conf = [
+                    d for d in all_low_conf_data 
+                    if compute_actionability(d["text"]) >= 0.3
+                ]
+                
+                # If we have enough actionable signal, focus on that. 
+                # Otherwise, stay with the full bucket to avoid missing high-volume noise.
+                target_data = actionable_low_conf if len(actionable_low_conf) >= 15 else all_low_conf_data
+                
+                texts_to_cluster = [d["text"] for d in target_data]
+                months_to_cluster = [d["month"] for d in target_data]
+                
                 lc_embs = self.encoder.encode(
-                    all_low_conf, normalize_embeddings=True, show_progress_bar=False
+                    texts_to_cluster, normalize_embeddings=True, show_progress_bar=False
                 )
-                # NMF on embedding space (RELU-shift for non-negativity)
                 X_lc = lc_embs - lc_embs.min()
-                n_clusters = min(8, len(all_low_conf) // 10)
+                n_clusters = min(8, len(all_low_conf_data) // 10)
+                
                 if n_clusters >= 2:
                     nmf_emerge = _NMF(n_components=n_clusters, random_state=42, init="nndsvd", max_iter=300)
                     W_lc = nmf_emerge.fit_transform(X_lc)
 
+                    # Get last two months for velocity
+                    unique_months = sorted(list(set(months_to_cluster)))
+                    curr_m = unique_months[-1] if unique_months else "None"
+                    prev_m = unique_months[-2] if len(unique_months) > 1 else "None"
+
+                    feature_names = nmf_emerge.get_feature_names_out() if hasattr(nmf_emerge, "get_feature_names_out") else None
+                    if feature_names is None and hasattr(nmf_emerge, "components_"):
+                        # Fallback if fit_transform didn't return a vectorizer-ready model
+                        # (This can happen if we use raw NMF instead of Tfidf+NMF)
+                        pass
+
                     emerging_rows = []
                     for t_idx in range(n_clusters):
                         scores = W_lc[:, t_idx]
-                        top_ids = np.argsort(scores)[-5:][::-1]
-                        cluster_size = int(np.sum(scores > 0.05))
-                        if cluster_size < MIN_EMERGING:
-                            continue
-                        top_revs = [str(all_low_conf[i])[:120] for i in top_ids]
+                        top_ids = np.argsort(scores)[-10:][::-1] # Get top 10 for better labeling
+                        
+                        # Calculate temporal volume
+                        in_cluster_mask = scores > 0.10
+                        cluster_months = [months_to_cluster[idx] for idx, matches in enumerate(in_cluster_mask) if matches]
+                        cluster_size = len(cluster_months)
+                        
+                        if cluster_size < MIN_EMERGING: continue
+                        
+                        curr_vol = sum(1 for m in cluster_months if m == curr_m)
+                        prev_vol = sum(1 for m in cluster_months if m == prev_m)
+                        momentum = round(((curr_vol - prev_vol) / max(prev_vol, 1)) * 100, 1) if prev_m != "None" else 0
+
+                        # Phase 66: Intelligent Cluster Labeling
+                        cluster_reviews = [texts_to_cluster[i] for i in top_ids]
+                        
+                        # Generate keywords manually if feature_names not available
+                        # (Using simple split for proto-signals)
+                        words = " ".join(cluster_reviews).lower().split()
+                        from collections import Counter
+                        stop_words = {"the", "and", "app", "to", "it", "is", "a", "of", "in", "for", "with", "this"}
+                        core_keywords = [w for w, c in Counter(words).most_common(5) if w not in stop_words and len(w) > 3]
+                        kw_str = ", ".join(core_keywords)
+                        
+                        # Use semantic labeler for category best guess
+                        semantic_cat = generate_issue_label(kw_str, encoder=self.encoder)
+                        
+                        top_revs = [str(r)[:120] for r in cluster_reviews[:3]]
                         emerging_rows.append({
                             "cluster_id": t_idx,
+                            "label": f"{semantic_cat}",
+                            "keywords": kw_str,
                             "estimated_volume": cluster_size,
-                            "is_flagged": cluster_size >= 40,
+                            "is_flagged": cluster_size >= 15 or momentum > 50,
+                            "momentum_pct": momentum,
                             "sample_review_1": top_revs[0] if len(top_revs) > 0 else "",
                             "sample_review_2": top_revs[1] if len(top_revs) > 1 else "",
                             "sample_review_3": top_revs[2] if len(top_revs) > 2 else "",
@@ -626,13 +784,33 @@ class MLService:
                     curr_m = months_with_centroids[k]
                     cosine_sim = float(np.dot(monthly_centroids[prev_m], monthly_centroids[curr_m]))
                     drift = round(1.0 - cosine_sim, 4)  # 0 = stable, 1 = max drift
-                    drift = round(1.0 - cosine_sim, 4)  # 0 = stable, 1 = max drift
+                    
+                    # Phase 66: Extract shifting terms
+                    # We look for words that increased in frequency in the newest month
+                    words_prev = " ".join(monthly_texts[prev_m]).lower().split()
+                    words_curr = " ".join(monthly_texts[curr_m]).lower().split()
+                    
+                    c_prev = Counter(words_prev)
+                    c_curr = Counter(words_curr)
+                    
+                    # Calculate word momentum
+                    diff = {}
+                    for w in set(words_curr):
+                        if len(w) < 4: continue
+                        count_curr = c_curr[w]
+                        count_prev = c_prev.get(w, 0)
+                        # Score is absolute increase in appearance
+                        diff[w] = count_curr - count_prev
+
+                    top_shifting = [w for w, s in Counter(diff).most_common(3) if s > 0]
+                    
                     drift_rows.append({
                         "category": cat_label,
                         "month_from": prev_m,
                         "month_to": curr_m,
                         "drift_score": drift,
-                        "is_evolving": bool(drift > 0.15)
+                        "is_evolving": bool(drift > 0.12), # Slightly more sensitive
+                        "shifting_terms": ", ".join(top_shifting)
                     })
         except Exception as e:
             print(f"[Phase 25.2] Drift detection failed: {e}")
@@ -641,33 +819,35 @@ class MLService:
             pd.DataFrame(drift_rows).to_csv("data/processed/semantic_drift.csv", index=False)
         # ─────────────────────────────────────────────────────────────────────
 
-        # ── Phase 35 (final): Export NORMALIZED + SEVERITY-WEIGHTED time-series ──
-        # Now stores three metrics per category-month:
-        #   mentions              — raw count (for auditing/fallback)
-        #   normalized_rate       — mentions per 1000 reviews that month
-        #   severity_weighted_rate — sum(severity) per 1000 reviews (best metric)
-        #   total_reviews_in_month — denominator used for both rates
+        # ── Phase 53: Export NORMALIZED + REVENUE-WEIGHTED time-series ──
         timeseries_data = []
 
-        # Build per-category monthly severity sums from review_classifications data
-        sev_by_cat_month = {}
+        # Build per-category monthly metrics
+        cat_month_stats = {} # { (cat, month): { 'sev_sum': 0, 'impact_sum': 0 } }
         for clf in review_classifications:
             cat = clf.get("category", "")
             month = clf.get("date", "")
-            sev = clf.get("severity", 2.0)
             if cat and month and month not in ("NaT", "Unknown", ""):
                 key = (cat, month)
-                sev_by_cat_month[key] = sev_by_cat_month.get(key, 0.0) + sev
+                if key not in cat_month_stats:
+                    cat_month_stats[key] = {'sev_sum': 0.0, 'impact_sum': 0.0}
+                cat_month_stats[key]['sev_sum'] += clf.get("severity", 2.0)
+                cat_month_stats[key]['impact_sum'] += clf.get("financial_impact", 2.0)
 
         for t_id, data in topic_stats.items():
             label = generate_issue_label(data["keywords"], encoder=self.encoder)
             for month_str, m_count in data.get("monthly_mentions", {}).items():
                 total_in_month = monthly_review_totals.get(month_str, m_count)
                 norm_rate = round((m_count / max(total_in_month, 1)) * 1000, 2)
-                # Severity-weighted: sum of severity scores / total reviews * 1000
-                sev_sum = sev_by_cat_month.get((label, month_str),
-                          sev_by_cat_month.get((t_id, month_str), m_count * 2.0))
-                sev_weighted = round((sev_sum / max(total_in_month, 1)) * 1000, 2)
+                
+                # Fetch aggregated metrics
+                stats = cat_month_stats.get((label, month_str), 
+                        cat_month_stats.get((t_id, month_str), 
+                        {'sev_sum': m_count * 2.0, 'impact_sum': m_count * 2.0}))
+                
+                sev_weighted = round((stats['sev_sum'] / max(total_in_month, 1)) * 1000, 2)
+                revenue_risk = round((stats['impact_sum'] / max(total_in_month, 1)) * 1000, 2)
+                
                 timeseries_data.append({
                     "topic_id": t_id,
                     "issue_label": label,
@@ -675,6 +855,7 @@ class MLService:
                     "mentions": m_count,
                     "normalized_rate": norm_rate,
                     "severity_weighted_rate": sev_weighted,
+                    "revenue_risk_score": revenue_risk,
                     "total_reviews_in_month": total_in_month
                 })
         # ─────────────────────────────────────────────────────────────────────

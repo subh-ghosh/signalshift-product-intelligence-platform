@@ -108,19 +108,48 @@ def get_dashboard_dataset():
 def sentiment_distribution(limit_months: int = 0):
     try:
         df = get_dashboard_dataset()
-        if limit_months > 0 and "at" in df.columns:
+        if "at" in df.columns:
             df["at"] = pd.to_datetime(df["at"], errors="coerce")
-            cutoff = pd.Timestamp.now() - pd.DateOffset(months=limit_months)
-            df = df[df["at"] >= cutoff]
-        positive = (df["sentiment"] == "positive").sum()
-        negative = (df["sentiment"] == "negative").sum()
-        return {"positive": int(positive), "negative": int(negative)}
+            
+        now = pd.Timestamp.now()
+        
+        # Current Window
+        if limit_months > 0:
+            cutoff = now - pd.DateOffset(months=limit_months)
+            curr_df = df[df["at"] >= cutoff]
+            # Previous Window (for momentum)
+            prev_cutoff = now - pd.DateOffset(months=limit_months * 2)
+            prev_df = df[(df["at"] >= prev_cutoff) & (df["at"] < cutoff)]
+        else:
+            curr_df = df
+            prev_df = pd.DataFrame()
+
+        pos = (curr_df["sentiment"] == "positive").sum()
+        neg = (curr_df["sentiment"] == "negative").sum()
+        total = pos + neg
+        pos_pct = (pos / total * 100) if total > 0 else 0
+        
+        # Calculate Momentum
+        momentum = 0.0
+        if not prev_df.empty:
+            prev_pos = (prev_df["sentiment"] == "positive").sum()
+            prev_neg = (prev_df["sentiment"] == "negative").sum()
+            prev_total = prev_pos + prev_neg
+            prev_pos_pct = (prev_pos / prev_total * 100) if prev_total > 0 else 0
+            momentum = round(pos_pct - prev_pos_pct, 1)
+
+        return {
+            "positive": int(pos),
+            "negative": int(neg),
+            "momentum": momentum
+        }
     except Exception as e:
         print(f"Sentiment error: {e}")
         df = get_dashboard_dataset()
         return {
             "positive": int((df["sentiment"] == "positive").sum()),
-            "negative": int((df["sentiment"] == "negative").sum())
+            "negative": int((df["sentiment"] == "negative").sum()),
+            "momentum": 0.0
         }
 
 
@@ -143,6 +172,7 @@ def top_issues(limit_months: int = 0):
 
         curr_mentions_map = {}
         prev_mentions_map = {}
+        metric_col = "mentions" # Default fallback
 
         if limit_months > 0:
             try:
@@ -151,24 +181,32 @@ def top_issues(limit_months: int = 0):
                 curr_months = all_months[-limit_months:]
                 prev_months = all_months[-(limit_months * 2):-limit_months] if len(all_months) >= limit_months * 2 else []
 
-                curr_win = ts_df[ts_df["month"].isin(curr_months)].groupby("topic_id")["mentions"].sum()
+                # Use issue_label for grouping to match the "label" column in topic_df
+                curr_win = ts_df[ts_df["month"].isin(curr_months)].groupby("issue_label")["mentions"].sum()
                 curr_mentions_map = curr_win.to_dict()
 
                 if prev_months:
-                    prev_win = ts_df[ts_df["month"].isin(prev_months)].groupby("topic_id")["mentions"].sum()
+                    prev_win = ts_df[ts_df["month"].isin(prev_months)].groupby("issue_label")["mentions"].sum()
                     prev_mentions_map = prev_win.to_dict()
                     
-                # We also need the best available rate for sorting/display
-                metric_col = "severity_weighted_rate" if "severity_weighted_rate" in ts_df.columns else "normalized_rate" if "normalized_rate" in ts_df.columns else "mentions"
+                # Vanguard Elite: Prioritize Revenue Risk over simple Severity
+                if "revenue_risk_score" in ts_df.columns:
+                    metric_col = "revenue_risk_score"
+                elif "severity_weighted_rate" in ts_df.columns:
+                    metric_col = "severity_weighted_rate"
+                elif "normalized_rate" in ts_df.columns:
+                    metric_col = "normalized_rate"
+                else:
+                    metric_col = "mentions"
                 
-                # Apply the noise floor: minimum 15 mentions required to be ranked by rate.
+                # Apply the noise floor
                 valid_curr_topics = curr_win[curr_win >= 15].index
                 
-                # Peak rate in the window (same as Trending Chart velocity selection methodology)
+                # Peak rate in the window
                 curr_rate = ts_df[
                     (ts_df["month"].isin(curr_months)) & 
-                    (ts_df["topic_id"].isin(valid_curr_topics))
-                ].groupby("topic_id")[metric_col].max()
+                    (ts_df["issue_label"].isin(valid_curr_topics))
+                ].groupby("issue_label")[metric_col].max()
 
                 # Apply windowed counts to topic_df
                 windowed = curr_win.reset_index()
@@ -184,6 +222,20 @@ def top_issues(limit_months: int = 0):
                 topic_df["sort_metric"] = topic_df["windowed_rate"].fillna(0.0).astype(float)
             except Exception as e:
                 print(f"[top-issues] Windowed mentions error: {e}")
+        else:
+            # Phase 62: Global Revenue Risk fallback for "All Time"
+            try:
+                ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+                # Group by label and sum the revenue risk score across all time
+                global_risk = ts_df.groupby("issue_label")["revenue_risk_score"].sum()
+                global_risk_df = global_risk.reset_index()
+                global_risk_df.columns = [label_col_ta, "global_revenue_risk"]
+                topic_df = topic_df.merge(global_risk_df, on=label_col_ta, how="left")
+                # If SortByRevenue is active, this will be used
+                topic_df["sort_metric_revenue"] = topic_df["global_revenue_risk"].fillna(0.0)
+                metric_col = "revenue_risk_score" # Signal to the loop below
+            except:
+                pass
 
         if "sort_metric" not in topic_df.columns:
             topic_df["sort_metric"] = topic_df["mentions"]
@@ -212,12 +264,16 @@ def top_issues(limit_months: int = 0):
                     velocity_dir = "new"
                     velocity_label = "NEW"
 
+            # Phase 62: Use global revenue risk if sorting by it
+            rr_val = row.get("sort_metric_revenue", row.get("sort_metric", 0.0))
+
             issues.append({
                 "issue": label,
                 "keywords": label,
                 "mentions": mentions,
                 "sort_metric": row.get("sort_metric", mentions),
                 "avg_severity": round(float(row.get("avg_severity", 0.0)), 2),
+                "revenue_risk": round(float(rr_val), 2) if metric_col == "revenue_risk_score" else None,
                 "velocity": velocity,
                 "velocity_dir": velocity_dir,
                 "velocity_label": velocity_label
@@ -234,26 +290,70 @@ def top_issues(limit_months: int = 0):
 # -----------------------------
 
 @router.get("/dashboard/aspects")
-def top_aspects(limit_months: int = 0):
+def top_aspects(limit_months: int = 3):
+    """
+    Vanguard Aspect Intelligence Map endpoint.
+    Synthesizes semantic mapping, sentiment intensity, and MoM momentum.
+    """
     try:
-        # If no time window, serve the pre-aggregated aspect CSV
-        if limit_months == 0:
-            aspect_df = pd.read_csv("data/processed/aspect_analysis.csv")
-            return aspect_df.sort_values("mentions", ascending=False).to_dict(orient="records")
-        # Windowed: approximate by scaling total mentions by fraction of months active
-        aspect_df = pd.read_csv("data/processed/aspect_analysis.csv")
-        try:
-            ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
-            all_months = sorted(ts_df["month"].unique())
-            total_months = max(len(all_months), 1)
-            effective_months = min(limit_months, total_months)
-            scale = effective_months / total_months
-            aspect_df = aspect_df.copy()
-            aspect_df["mentions"] = (aspect_df["mentions"] * scale).round().astype(int)
-        except Exception:
-            pass
-        return aspect_df.sort_values("mentions", ascending=False).to_dict(orient="records")
-    except FileNotFoundError:
+        ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+        topic_analysis = pd.read_csv("data/processed/topic_analysis.csv")
+        all_months = sorted(ts_df["month"].unique())
+        
+        # 1. Topic-to-Aspect Mapping
+        mapping = {
+            "Performance/Technical": ["App Crash & Launch Failure", "Performance & Speed", "Bugs & Technical Errors"],
+            "Content/Library": ["Content & Features", "Download & Offline", "Video & Streaming Playback"],
+            "UI/UX Experience": ["UI & Navigation", "Notifications & Spam"],
+            "Pricing/Subscription": ["Subscription & Billing", "Account & Login", "Privacy & Security"],
+            "General": ["Customer Support", "General App Feedback"]
+        }
+        
+        # 2. Setup Windows
+        curr_months = all_months[-limit_months:]
+        prev_months = all_months[-(limit_months * 2):-limit_months] if len(all_months) >= limit_months * 2 else all_months[:-limit_months]
+        
+        # 3. Sentiment intensity (avg_severity from topic_analysis)
+        topic_sev = topic_analysis.set_index("label")["avg_severity"].to_dict()
+
+        aspect_data = []
+        for aspect, labels in mapping.items():
+            if aspect == "General": continue # Radar usually excludes general
+
+            # Current Window Stats
+            curr_window = ts_df[(ts_df["issue_label"].isin(labels)) & (ts_df["month"].isin(curr_months))]
+            mentions = int(curr_window["mentions"].sum())
+            
+            # Weighted Sentiment Intensity
+            # (Average of severity across contributes topics, weighted by their mentions)
+            total_sev = 0
+            total_vol = 0
+            for label in labels:
+                vol = curr_window[curr_window["issue_label"] == label]["mentions"].sum()
+                total_sev += topic_sev.get(label, 2.0) * vol
+                total_vol += vol
+            sentiment_score = round(total_sev / max(total_vol, 1), 2)
+
+            # MoM Momentum
+            prev_window = ts_df[(ts_df["issue_label"].isin(labels)) & (ts_df["month"].isin(prev_months))]
+            curr_vol = curr_window["mentions"].sum()
+            prev_vol = prev_window["mentions"].sum()
+            momentum_pct = round(((curr_vol - prev_vol) / max(prev_vol, 1)) * 100, 1) if prev_vol > 0 else 100
+
+            # Top Contributor
+            top_topic = curr_window.groupby("issue_label")["mentions"].sum().idxmax() if not curr_window.empty else "None"
+
+            aspect_data.append({
+                "aspect": aspect,
+                "mentions": mentions,
+                "sentiment_score": sentiment_score,
+                "momentum_pct": momentum_pct,
+                "top_topic": top_topic
+            })
+
+        return sorted(aspect_data, key=lambda x: x["mentions"], reverse=True)
+    except Exception as e:
+        print(f"[dashboard/aspects] error: {e}")
         return []
 
 # -----------------------------
@@ -287,14 +387,12 @@ def get_topic_benchmark():
         return []
 
 @router.get("/dashboard/trending-issues")
-def trending_issues(limit_months: int = 0):
+def trending_issues(limit_months: int = 0, metric: str = "severity"):
     """
     Phase 35 (final) — Statistically rigorous time-series.
 
     Improvements applied in order:
-    1. Severity-weighted rate: prefers `severity_weighted_rate` if available, else
-       `normalized_rate` (per 1k reviews), else raw `mentions`. Severity-weighted
-       means a month with 30 CRITICAL crashes counts more than 100 mild UI niggles.
+    1. Metric Selection: dynamically uses revenue_risk_score, severity_weighted_rate, or normalized_rate based on the UI toggle.
     2. Full month coverage: every month in the corpus range is present for every
        category (filled with NaN, not 0). Prevents the rolling average from bridging
        over genuine data-void gaps.
@@ -310,7 +408,9 @@ def trending_issues(limit_months: int = 0):
         df = df.sort_values(by="month")
 
         # ── 1. Pick best available metric column ────────────────────────────
-        if "severity_weighted_rate" in df.columns:
+        if metric == "revenue" and "revenue_risk_score" in df.columns:
+            metric_col = "revenue_risk_score"
+        elif "severity_weighted_rate" in df.columns:
             metric_col = "severity_weighted_rate"
         elif "normalized_rate" in df.columns:
             metric_col = "normalized_rate"
@@ -539,28 +639,33 @@ def issue_reviews(issue: str, limit_months: int = 0):
                     matched = matched[matched["date"].isin(target_months)]
 
             if not matched.empty:
-                # Sort by confidence descending, deduplicate, return top 20
+                # Phase 62: Return rich metadata objects, not just strings
                 matched = matched.sort_values("confidence", ascending=False)
-                reviews_list = (
-                    matched["text"]
-                    .dropna()
-                    .tolist()
-                )
-                # Basic dedup (exact)
+                
+                # Phase 63: Increase limit to 100 and soften deduplication
                 seen = set()
-                deduped = []
-                for r in reviews_list:
-                    key = str(r)[:80]
-                    if key not in seen and len(str(r)) > 20:
+                results = []
+                for _, row in matched.iterrows():
+                    txt = str(row["text"])
+                    key = txt[:200]  # More specific key
+                    if key not in seen and len(txt) > 20:
                         seen.add(key)
-                        deduped.append(str(r))
-                    if len(deduped) >= 20:
+                        results.append({
+                            "text": txt,
+                            "at": str(row.get("date", "Recent")),
+                            "score": int(row.get("severity", 0)),
+                            "user_tier": str(row.get("user_tier", "Standard")),
+                            "value_weight": float(row.get("value_weight", 1.0)),
+                            "app_version": str(row.get("app_version", "N/A")),
+                            "upvotes": int(row.get("upvotes", 0))
+                        })
+                    if len(results) >= 100:
                         break
-
+                
                 return {
                     "issue": issue,
                     "keywords": issue,
-                    "reviews": deduped,
+                    "reviews": results,
                     "window": f"Last {limit_months}M" if limit_months > 0 else "All Time",
                     "total_in_window": len(matched)
                 }
@@ -742,7 +847,27 @@ def get_intelligence_alerts(limit_months: int = 3):
 
         alerts = []
         
-        # 4. Generate Unified Alerts
+        # 4. Aspect Dominance Sensor (Legacy Sensor Unification)
+        try:
+            aspect_df = pd.read_csv("data/processed/aspect_analysis.csv")
+            total_aspect_mentions = aspect_df["mentions"].sum()
+            if total_aspect_mentions > 0:
+                for _, row in aspect_df.iterrows():
+                    pct_share = (row["mentions"] / total_aspect_mentions) * 100
+                    if pct_share >= 25.0:
+                        alerts.append({
+                            "id": f"asp-{row['aspect'].lower()[:15]}",
+                            "category": row["aspect"],
+                            "type": "ASPECT_DOMINANCE",
+                            "severity": "HIGH",
+                            "message": f"Dominant Volume: Accounting for {pct_share:.1f}% of all feedback.",
+                            "velocity_pct": 0,
+                            "is_anomaly": False,
+                            "link": None
+                        })
+        except Exception: pass
+
+        # 5. Generate Unified Topic Alerts
         for topic in curr_stats.index:
             c_rate = curr_stats.loc[topic, "curr_rate"]
             c_vol = curr_stats.loc[topic, "curr_vol"]
@@ -750,12 +875,12 @@ def get_intelligence_alerts(limit_months: int = 3):
             # Skip if volume is negligible
             if c_vol < 5: continue
             
-            p_rate = prev_stats.loc[topic, "prev_rate"] if topic in prev_stats.index else 0
+            p_vol = prev_stats.loc[topic, "prev_vol"] if topic in prev_stats.index else 0
             
-            # --- Velocity Signal ---
+            # --- Velocity Signal (Volume Based) ---
             velocity_pct = 0
-            if p_rate > 0:
-                velocity_pct = round(((c_rate - p_rate) / p_rate) * 100, 1)
+            if p_vol > 0:
+                velocity_pct = round(((c_vol - p_vol) / p_vol) * 100, 1)
             else:
                 velocity_pct = 100 # New issue spike
             
@@ -771,14 +896,14 @@ def get_intelligence_alerts(limit_months: int = 3):
                 if topic_ts[metric_col].values[-1] > threshold and topic_ts[metric_col].values[-1] > 0.5:
                     is_anomaly = True
 
-            # Create Alert if Significant
-            if is_anomaly or velocity_pct > 20:
-                severity = "CRITICAL" if (is_anomaly and velocity_pct > 50) else "HIGH" if (is_anomaly or velocity_pct > 30) else "WATCH"
+            # Create Alert if Significant (lower threshold to 10% to catch WATCH items)
+            if is_anomaly or velocity_pct > 10:
+                severity = "CRITICAL" if (is_anomaly and velocity_pct > 40) else "HIGH" if (is_anomaly or velocity_pct > 25) else "WATCH"
                 
                 # Build Message
                 msg_parts = []
                 if is_anomaly: msg_parts.append(f"Statistically out-of-control (Limit: {threshold:.1f})")
-                if velocity_pct > 20: msg_parts.append(f"MoM spike of +{velocity_pct}%")
+                if velocity_pct > 10: msg_parts.append(f"MoM spike of +{velocity_pct}%")
                 
                 alert_obj = {
                     "id": f"int-{topic.lower().replace(' ', '-')[:15]}",
@@ -884,6 +1009,159 @@ def dashboard_kpis(limit_months: int = 0):
 # EMERGING ISSUES
 # -----------------------------
 
+@router.get("/dashboard/sentiment-stability")
+def get_sentiment_stability():
+    """Calculates app-wide sentiment stability using Bollinger bands."""
+    try:
+        ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+        topic_analysis = pd.read_csv("data/processed/topic_analysis.csv")
+        
+        # Get severity mapping
+        severity_map = topic_analysis.set_index("label")["avg_severity"].to_dict()
+        
+        # Aggregate sentiment per month
+        # Avg Severity per month = Sum(mentions * topic_severity) / Sum(mentions)
+        months = sorted(ts_df["month"].unique())
+        stability_data = []
+        
+        for m in months:
+            m_df = ts_df[ts_df["month"] == m]
+            total_vol = m_df["mentions"].sum()
+            if total_vol == 0: continue
+            
+            weighted_sev_sum = 0
+            for _, row in m_df.iterrows():
+                weighted_sev_sum += row["mentions"] * severity_map.get(row["issue_label"], 2.0)
+            
+            avg_sentiment = round(weighted_sev_sum / total_vol, 3)
+            stability_data.append({"month": m, "score": avg_sentiment})
+
+        if not stability_data: return []
+
+        # Convert to DF for rolling stats
+        df = pd.DataFrame(stability_data)
+        df["rolling_mean"] = df["score"].rolling(window=3, min_periods=1).mean()
+        df["rolling_std"] = df["score"].rolling(window=3, min_periods=1).std().fillna(0)
+        
+        df["upper_band"] = df["rolling_mean"] + (1.5 * df["rolling_std"])
+        df["lower_band"] = df["rolling_mean"] - (1.5 * df["rolling_std"])
+        
+        # High volatility = score is outside the bands
+        df["is_volatile"] = (df["score"] > df["upper_band"]) | (df["score"] < df["lower_band"])
+        
+        return df.to_dict(orient="records")
+    except Exception as e:
+        print(f"Sentiment Stability Error: {e}")
+        return []
+
+@router.get("/dashboard/semantic-search")
+def semantic_search(query: str, limit_months: int = 0):
+    try:
+        if not query:
+            return []
+            
+        df = get_dashboard_dataset()
+        if "at" in df.columns:
+            df["at"] = pd.to_datetime(df["at"], errors="coerce")
+            
+        if limit_months > 0:
+            cutoff = pd.Timestamp.now() - pd.DateOffset(months=limit_months)
+            df = df[df["at"] >= cutoff]
+            
+        reviews = df["content"].astype(str).tolist()
+        
+        if ml_service is None:
+            return []
+            
+        return ml_service.semantic_search(query, reviews)
+    except Exception as e:
+        print(f"Semantic search error: {e}")
+        return []
+
+@router.get("/dashboard/live-ticker")
+def get_live_ticker():
+    """Returns a stream of high-confidence recently processed reviews."""
+    try:
+        # Vanguard Elite: Use central dataset utility to respect user uploads
+        df = get_dashboard_dataset()
+        if "at" in df.columns:
+            df["at"] = pd.to_datetime(df["at"], errors="coerce")
+            df = df.sort_values("at", ascending=False)
+        else:
+            df = df.iloc[::-1]
+            
+        latest = df.head(15)
+        result = []
+        for _, row in latest.iterrows():
+            content = str(row.get("content", row.get("cleaned_content", "")))
+            if len(content) < 30: continue
+            result.append({
+                "id": str(row.get("reviewId", "unknown")),
+                "text": content[:200],
+                "sentiment": str(row.get("sentiment", "neutral")),
+                "at": str(row.get("at", "recent"))
+            })
+        return result
+    except Exception as e:
+        print(f"Ticker Error: {e}")
+        return []
+
+@router.get("/dashboard/diagnostic-evidence")
+def get_diagnostic_evidence(aspect: str = None, month: str = None, topic: str = None):
+    """Returns grounded evidence reviews for a specific cross-section."""
+    try:
+        # Phase 62: Try to use enriched dataset first to enable rich badges/weights
+        CLF_PATH = "data/processed/review_classifications.csv"
+        if os.path.exists(CLF_PATH):
+            df = pd.read_csv(CLF_PATH)
+            # Filter logic (search strings)
+            if month:
+                df = df[df["date"].astype(str).str.contains(month, na=False)]
+            if topic:
+                df = df[df["category"].str.contains(topic, case=False, na=False) | 
+                       df["text"].str.contains(topic, case=False, na=False)]
+            
+            # Phase 63: Bump limit for diagnostic cross-sections
+            df = df.sort_values("confidence", ascending=False).head(100)
+            result = []
+            for _, row in df.iterrows():
+                result.append({
+                    "id": "enriched-" + str(row.name),
+                    "text": str(row.get("text")),
+                    "at": str(row.get("date", "")),
+                    "score": int(row.get("severity", 0)),
+                    "user_tier": str(row.get("user_tier", "Standard")),
+                    "value_weight": float(row.get("value_weight", 1.0)),
+                    "app_version": str(row.get("app_version", "N/A")),
+                    "upvotes": int(row.get("upvotes", 0))
+                })
+            if result:
+                return result
+
+        # Fallback to base dataset
+        df = get_dashboard_dataset()
+        if month:
+            df = df[df["at"].astype(str).str.contains(month, na=False)]
+        if topic:
+            df = df[df["content"].str.contains(topic, case=False, na=False)]
+        
+        # Phase 63: Bump fallback limit
+        df = df.head(100)
+        result = []
+        for _, row in df.iterrows():
+            result.append({
+                "id": str(row.get("reviewId")),
+                "text": str(row.get("content")),
+                "score": int(row.get("score", 0)),
+                "at": str(row.get("at")),
+                "user_tier": "Standard",
+                "value_weight": 1.0
+            })
+        return result
+    except Exception as e:
+        print(f"Diagnostic Error: {e}")
+        return []
+
 @router.get("/dashboard/emerging-issues")
 def emerging_issues_endpoint(limit_months: int = 0):
     """Returns flagged emerging issue clusters."""
@@ -903,7 +1181,10 @@ def emerging_issues_endpoint(limit_months: int = 0):
                     samples.append(val[:180])
             result.append({
                 "cluster_id": int(row["cluster_id"]),
+                "label": str(row.get("label", f"Cluster #{int(row['cluster_id'])+1}")).replace(" (Proto)", ""),
+                "keywords": str(row.get("keywords", "")) if str(row.get("keywords", "")) not in ("nan", "", "None") else "",
                 "estimated_volume": int(row["estimated_volume"]),
+                "momentum_pct": float(row.get("momentum_pct", 0)),
                 "sample_reviews": samples
             })
         return result
@@ -928,12 +1209,17 @@ def semantic_drift_endpoint(limit_months: int = 0):
             df = df[df["month_from"].isin(target_months)]
 
         # Aggregate avg drift per category
+        # Also grab the most recent shifting_terms for the context
         agg = (
             df.groupby("category")
-            .agg(avg_drift=("drift_score", "mean"), max_drift=("drift_score", "max"),
-                 n_months=("drift_score", "count"))
+            .agg({
+                "drift_score": ["mean", "max", "count"],
+                "shifting_terms": "last"
+            })
             .reset_index()
         )
+        agg.columns = ["category", "avg_drift", "max_drift", "n_months", "shifting_terms"]
+        
         agg["is_evolving"] = agg["avg_drift"] > 0.10
         agg = agg[agg["is_evolving"]].sort_values("avg_drift", ascending=False)
 
@@ -944,6 +1230,7 @@ def semantic_drift_endpoint(limit_months: int = 0):
                 "avg_drift": round(float(row["avg_drift"]), 4),
                 "max_drift": round(float(row["max_drift"]), 4),
                 "n_months": int(row["n_months"]),
+                "shifting_terms": str(row.get("shifting_terms", "stable")),
                 "trend_bar": min(round(row["avg_drift"] * 50), 5)  # 0-5 visual bar
             })
         return result

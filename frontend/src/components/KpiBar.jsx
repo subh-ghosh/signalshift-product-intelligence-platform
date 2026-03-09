@@ -2,47 +2,72 @@ import { useEffect, useState } from "react"
 import api from "../services/api"
 import { SkeletonKpiBar } from "./Skeleton"
 
-// Delta badge: shows +12% ↑ or -5% ↓
-function DeltaBadge({ delta, isPercent = true }) {
+// Clean Light Theme Delta text (Pill style)
+function DeltaText({ delta, isPercent = true }) {
     if (delta === null || delta === undefined) return null
     const up = delta > 0
-    const color = up ? "#1DB954" : "#E50914"
-    const arrow = up ? "↑" : "↓"
-    const abs = Math.abs(delta)
+    // Emerald Green for positive, Rose Red for negative
+    const color = up ? "#10B981" : "#EF4444"
+    const bgColor = up ? "#ECFDF5" : "#FEF2F2"
+    const sign = up ? "↑" : "↓"
+    const displayDelta = Math.abs(delta)
+
     return (
-        <span style={{
-            fontSize: "11px", fontWeight: 700, padding: "2px 7px",
-            borderRadius: "12px", background: `${color}22`,
-            border: `1px solid ${color}44`, color,
-            display: "inline-flex", alignItems: "center", gap: "3px",
-            marginTop: "4px", whiteSpace: "nowrap"
+        <span title="Growth Rate (Change from previous period)" style={{
+            fontSize: "12px",
+            fontWeight: 700,
+            color: color,
+            backgroundColor: bgColor,
+            padding: "4px 8px",
+            borderRadius: "6px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "2px"
         }}>
-            {arrow} {up ? "+" : "−"}{abs}{isPercent ? "%" : ""}
+            <span>{sign}</span> {isPercent ? Math.round(displayDelta) : displayDelta}{isPercent ? "%" : ""}
         </span>
     )
 }
 
-// Single KPI metric card with optional delta
-function KpiCard({ label, value, sub, color = "#fff", icon, delta, deltaIsPercent = true }) {
+// Clean Light Theme KPI Card
+function KpiCard({ label, value, sub, icon, delta, deltaIsPercent = true, tooltip }) {
     return (
-        <div style={{
-            flex: 1,
-            minWidth: "140px",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "12px",
-            padding: "20px 24px",
+        <div className="glass-card" title={tooltip} style={{
             display: "flex",
             flexDirection: "column",
-            gap: "4px"
+            padding: "24px",
+            gap: "12px"
         }}>
-            <div style={{ fontSize: "22px" }}>{icon}</div>
-            <div style={{ fontSize: "28px", fontWeight: 800, color, letterSpacing: "-0.5px" }}>
+            {/* Top Row: Label and Icon */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "#64748B" }}>
+                    {label}
+                </div>
+                <div style={{
+                    width: "36px",
+                    height: "36px",
+                    background: "#EFF6FF", // Soft blue background
+                    color: "#3B82F6", // Primary blue
+                    borderRadius: "10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "18px"
+                }}>
+                    {icon}
+                </div>
+            </div>
+
+            {/* Middle Row: Primary Value */}
+            <div style={{ fontSize: "32px", fontWeight: 800, color: "#0F172A", lineHeight: "1", marginTop: "4px" }}>
                 {value ?? "—"}
             </div>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: "#ccc" }}>{label}</div>
-            {sub && <div style={{ fontSize: "11px", color: "#555" }}>{sub}</div>}
-            <DeltaBadge delta={delta} isPercent={deltaIsPercent} />
+
+            {/* Bottom Row: Delta & Subtext */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px" }}>
+                <DeltaText delta={delta} isPercent={deltaIsPercent} />
+                {sub && <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: 500 }}>{sub}</span>}
+            </div>
         </div>
     )
 }
@@ -62,47 +87,48 @@ export default function KpiBar({ limitMonths = 0 }) {
     if (loading) return <SkeletonKpiBar />
     if (!kpis) return null
 
-    const sentimentColor = kpis.positive_pct >= 60 ? "#1DB954" : kpis.positive_pct >= 40 ? "#FFB347" : "#E50914"
-    const ratingColor = kpis.avg_rating >= 3.5 ? "#1DB954" : kpis.avg_rating >= 2.5 ? "#FFB347" : "#E50914"
     const d = kpis.deltas || {}
 
     return (
-        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "32px" }}>
+        <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: "24px",
+            marginBottom: "32px",
+            width: "100%"
+        }}>
             <KpiCard
                 icon="📊"
-                label="Total Reviews"
+                label="Total Feedback"
                 value={kpis.total_reviews.toLocaleString()}
                 sub={kpis.window}
-                color="#fff"
                 delta={d.reviews}
                 deltaIsPercent={true}
+                tooltip="Total volume of customer feedback reviewed."
             />
             <KpiCard
                 icon="⭐"
                 label="Avg Rating"
                 value={kpis.avg_rating ? `${kpis.avg_rating}/5.0` : "N/A"}
-                sub="vs. previous period"
-                color={ratingColor}
                 delta={d.rating}
                 deltaIsPercent={false}
+                tooltip="Average star rating across all reviews."
             />
             <KpiCard
                 icon="😊"
-                label="Positive Sentiment"
+                label="Customer Happiness"
                 value={`${kpis.positive_pct}%`}
-                sub={`${(100 - kpis.positive_pct).toFixed(1)}% negative`}
-                color={sentimentColor}
                 delta={d.positive_pct}
                 deltaIsPercent={false}
+                tooltip="Percentage of reviews expressing positive emotional tone."
             />
             <KpiCard
-                icon="🔴"
-                label="Active Issue Types"
+                icon="⚠️"
+                label="Total Issues Found"
                 value={kpis.active_issues}
-                sub="canonical categories"
-                color={kpis.active_issues > 8 ? "#E50914" : "#FFB347"}
                 delta={d.active_issues}
                 deltaIsPercent={false}
+                tooltip="Number of distinct problem areas currently identified."
             />
         </div>
     )

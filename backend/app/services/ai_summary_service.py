@@ -71,11 +71,11 @@ class AiSummaryService:
             top_score   = float(top_issue.get("sort_score", 0.0))
             top_sev     = float(top_issue.get("avg_severity", 0.0))
             
-            # --- 1.5 ADVANCED COGNITIVE ENGINE (Anomalies, Correlations, Forecasts) ---
-            diagnostic_prefix = "[STABLE] "
+            # --- 1.5 ADVANCED COGNITIVE ENGINE ---
+            diagnostic_prefix = "Steady: "
             cognitive_insights = []
             
-            # A. Statistical Anomaly Detection (Bollinger)
+            # A. Statistical Anomaly Detection
             top_ts = timeseries_df[timeseries_df["issue_label"] == top_label].sort_values("month")
             if len(top_ts) >= 3:
                 vals = top_ts[metric_col].values
@@ -84,12 +84,11 @@ class AiSummaryService:
                 upper_bound = mean + (1.5 * std) if std > 0 else mean 
                 
                 if vals[-1] > upper_bound and vals[-1] > 0.5:
-                    diagnostic_prefix = "🚨 [ANOMALY ALERT] "
-                    cognitive_insights.append(f"Statistically out of control (>{upper_bound:.1f} threshold).")
+                    diagnostic_prefix = "Significant Spike: "
                 elif vals[-1] > mean:
-                    diagnostic_prefix = "📈 [ACCELERATING] "
+                    diagnostic_prefix = "Rising: "
                 else:
-                    diagnostic_prefix = "📉 [STABILIZING] "
+                    diagnostic_prefix = "Steady: "
 
             # B. Pearson Correlation (Root Cause Linkage)
             top_5_labels = topic_df.head(5)["label"].tolist()
@@ -107,20 +106,19 @@ class AiSummaryService:
                     if not strong_corr.empty:
                         linked_issue = strong_corr.idxmax()
                         match_pct = int(strong_corr.max() * 100)
-                        cognitive_insights.append(f"Highly linked to **{linked_issue}** ({match_pct}% correlation), suggesting a shared root cause.")
+                        cognitive_insights.append(f"Highly linked to **{linked_issue}**, suggesting they might have the same root cause.")
 
-            # C. T+1 Linear Forecasting
+            # C. Simple Forecasting
             if len(top_ts) >= 3:
-                vals = top_ts[metric_col].values[-3:]
+                vals_last = top_ts[metric_col].values[-3:]
                 x = [0, 1, 2]
-                y = vals
+                y = vals_last
                 slope = (3 * (x[0]*y[0] + x[1]*y[1] + x[2]*y[2]) - sum(x)*sum(y)) / (3*sum([i**2 for i in x]) - sum(x)**2)
-                forecast_val = max(0, vals[-1] + slope)
                 
                 if slope > 0.2:
-                    cognitive_insights.append(f"Risk Warning: Projected to rise to ~{forecast_val:.1f} next cycle.")
+                    cognitive_insights.append(f"This is expected to get worse soon. We should look into it.")
                 elif slope < -0.2:
-                    cognitive_insights.append(f"Recovery Path: Projected to drop to ~{forecast_val:.1f} next cycle.")
+                    cognitive_insights.append(f"This is expected to improve soon.")
 
             
             try:
@@ -131,11 +129,50 @@ class AiSummaryService:
 
             evidence = matching_reviews[0] if matching_reviews else "No clear textual evidence."
 
-            # 2. Aspect Intelligence
-            aspect_df_sorted = aspect_df.sort_values(by="mentions", ascending=False)
-            top_aspect = aspect_df_sorted.iloc[0] if not aspect_df_sorted.empty else None
+            # 2. Aspect Intelligence Map Synthesis
+            aspect_intelligence = []
+            try:
+                mapping = {
+                    "Performance/Technical": ["App Crash & Launch Failure", "Performance & Speed", "Bugs & Technical Errors"],
+                    "Content/Library": ["Content & Features", "Download & Offline", "Video & Streaming Playback"],
+                    "UI/UX Experience": ["UI & Navigation", "Notifications & Spam"],
+                    "Pricing/Subscription": ["Subscription & Billing", "Account & Login", "Privacy & Security"],
+                }
+                curr_months = months[-limit_months:] if limit_months > 0 else [months[-1]]
+                prev_months = months[-(limit_months*2):-limit_months] if limit_months > 0 and len(months) >= limit_months*2 else []
+                
+                for aspect, labels in mapping.items():
+                    curr_vol = timeseries_df[(timeseries_df["issue_label"].isin(labels)) & (timeseries_df["month"].isin(curr_months))]["mentions"].sum()
+                    if curr_vol > 0:
+                        prev_vol = timeseries_df[(timeseries_df["issue_label"].isin(labels)) & (timeseries_df["month"].isin(prev_months))]["mentions"].sum()
+                        momentum = round(((curr_vol - prev_vol) / max(prev_vol, 1)) * 100, 1) if prev_vol > 0 else 0
+                        status = "Getting Worse" if momentum > 15 else "Improving" if momentum < -15 else "Stable"
+                        aspect_intelligence.append(f"{aspect}: **{status}**")
+            except Exception as e:
+                print(f"Aspect synthesis error: {e}")
+
+            # 2.5 Sentiment Stability Synthesis
+            stability_alert = ""
+            try:
+                severity_map = topic_df.set_index("label")["avg_severity"].to_dict()
+                all_m = sorted(timeseries_df['month'].unique())
+                monthly_sentiment = []
+                for m in all_m:
+                    m_df = timeseries_df[timeseries_df["month"] == m]
+                    weighted_sum = sum(row["mentions"] * severity_map.get(row["issue_label"], 2.0) for _, row in m_df.iterrows())
+                    vol = m_df["mentions"].sum()
+                    if vol > 0: monthly_sentiment.append(weighted_sum / vol)
+                
+                if len(monthly_sentiment) >= 3:
+                    vals = monthly_sentiment
+                    mean = sum(vals[:-1]) / len(vals[:-1])
+                    std = (sum((x - mean)**2 for x in vals[:-1]) / len(vals[:-1]))**0.5
+                    if vals[-1] > mean + (1.5 * std) or vals[-1] < mean - (1.5 * std):
+                        stability_alert = " ⚠️ **HIGH EMOTIONAL VOLATILITY DETECTED**."
+            except Exception as e:
+                print(f"Stability synthesis error: {e}")
             
-            # 3. Time Series Trending (Momentum based on Mathematical Rates, not Volume)
+            # 3. Time Series Trending
             is_trending = False
             trend_direction = ""
             pct = 0
@@ -204,40 +241,58 @@ class AiSummaryService:
             except Exception:
                 pass
 
-            # Construct Markdown Report with Advanced Cognitive Synthesis
-            unit_suffix = " impact score" if metric_col == "severity_weighted_rate" else " rate" if metric_col == "normalized_rate" else " mentions"
+            # --- 4. Prescriptive Strategic Reasoning (Phase 55) ---
+            def classify_issue(label: str) -> str:
+                strategic_labels = {"Privacy & Security", "Subscription & Billing", "Content & Features", "Strategic Product Pivot"}
+                return "Long-term Plan" if label in strategic_labels else "Immediate Action"
 
-            report = [
-                f"- **{time_range_str}**",
-                f"\n- **Critical Action Item:** {diagnostic_prefix}{top_label} (Score: {top_score:.1f})"
+            def get_next_best_action(label: str, severity: float, momentum: float) -> str:
+                if severity > 4.0:
+                    return f"Urgent: Assign a team to fix this quickly to avoid losing money."
+                if momentum > 25:
+                    return f"Action: Check recent app updates to see what caused this sudden spike."
+                if label == "App Crash & Launch Failure":
+                    return "Action: Check technical logs and consider rolling back the last update."
+                return "Standard: Keep an eye on this trend and plan a fix in the next roadmap."
+
+            # --- Construct Narrative Report ---
+            impact_desc = "high impact" if top_score > 800 else "notable impact" if top_score > 400 else "minor impact"
+            
+            # 1. Primary Focus Block
+            primary_focus = f"### 💡 Primary Focus: {top_label}\n"
+            primary_focus += f"**Current Situation:** This topic is currently **{diagnostic_prefix.lower().strip(': ')}** and is having a **{impact_desc}** on your customers. "
+            if cognitive_insights:
+                primary_focus += " ".join(cognitive_insights)
+            
+            # 2. Recommendation Block
+            recommendation = f"### 🎯 Suggested Action\n"
+            recommendation += f"**{get_next_best_action(top_label, top_sev, pct if is_trending else 0)}**"
+
+            # 3. Overall Health Block
+            health = f"### 📊 General App Health\n"
+            health += f"**Status:** {stability_alert if stability_alert else '🟢 Monitoring is active. All systems are currently within normal performance ranges.'}\n\n"
+            if aspect_intelligence:
+                health += "**Category Performance:**\n" + "\n".join([f"- {item}" for item in aspect_intelligence])
+            
+            if biggest_riser and biggest_riser[0] != top_label:
+                health += f"\n\n**Watch Out:** {biggest_riser[0]} is starting to trend upward."
+
+            # 4. Customer Voice Block
+            voice = f"### 💬 What Customers are Saying\n"
+            voice += f"> *\"{evidence[:200]}...\"*"
+
+            # Final Assembly with Dividers
+            report_sections = [
+                primary_focus,
+                "---",
+                recommendation,
+                "---",
+                health,
+                "---",
+                voice
             ]
 
-            if cognitive_insights:
-                insight_str = "\n- **Cognitive Diagnostics:** " + " ".join(cognitive_insights)
-                report.append(insight_str)
-
-            if is_trending and not cognitive_insights: # Fallback if no deep insights
-                report.append(f"\n- **Trend:** {trend_direction.capitalize()} by {pct}% MoM")
-
-            if top_aspect is not None:
-                report.append(f"\n- **Root Cause Area:** {top_aspect['aspect']} functionality")
-
-            if biggest_riser and biggest_riser[0] != top_label:
-                report.append(f"\n- **Top Riser:** {biggest_riser[0]} spiked {int(biggest_riser[1])}% (+{biggest_riser[2]:.1f}{unit_suffix}) {window_desc}")
-                
-            if biggest_faller:
-                report.append(f"\n- **Top Faller:** {biggest_faller[0]} dropped {abs(int(biggest_faller[1]))}% {window_desc}")
-
-            if len(topic_df) > 1:
-                second_issue = topic_df.iloc[1]
-                second_label = str(second_issue.get("label", second_issue.get("keywords", "Unknown")))
-                second_score = float(second_issue.get("sort_metric", second_issue.get("sort_score", second_issue["mentions"])))
-                report.append(f"\n- **Secondary Watchlist:** {second_label} (Score: {second_score:.1f})")
-
-            report.append(f"\n- **Severity Indicator:** {top_label} scores {top_sev:.1f}/5.0 avg severity")
-            report.append(f"\n- **Primary Evidence:**\n  > *\"{evidence[:150]}...\"*")
-
-            return "".join(report)
+            return "\n\n".join(report_sections)
 
         except Exception as e:
             print(f"Error generating AI Summary: {e}")

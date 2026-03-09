@@ -19,7 +19,7 @@ export default function Home() {
         }}>
             <h1 style={{ fontSize: '4rem', marginBottom: '0' }}>SignalShift</h1>
             <p style={{ color: '#888', fontSize: '1.2rem', maxWidth: '600px', marginBottom: '50px' }}>
-                Advanced Product Intelligence & Churn Prediction System.
+                Advanced Customer Insights & Growth Prediction System.
             </p>
 
             <div className="glass-card" style={{ 
