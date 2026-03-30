@@ -1,45 +1,54 @@
 topic_id,issue_label,month,mentions,normalized_rate,severity_weighted_rate,revenue_risk_score,total_reviews_in_month
-App Crash & Launch Failure,App Crash & Launch Failure,2026-03,9,818.18,1790.91,1790.91,11
-App Crash & Launch Failure,App Crash & Launch Failure,2026-02,2,95.24,261.9,261.9,21
-App Crash & Launch Failure,App Crash & Launch Failure,2026-01,1,47.62,166.67,166.67,21
-App Crash & Launch Failure,App Crash & Launch Failure,2025-12,2,133.33,340.0,340.0,15
-App Crash & Launch Failure,App Crash & Launch Failure,2025-11,2,166.67,483.33,483.33,12
-App Crash & Launch Failure,App Crash & Launch Failure,2025-09,4,222.22,555.56,555.56,18
-App Crash & Launch Failure,App Crash & Launch Failure,2025-06,1,55.56,138.89,138.89,18
-App Crash & Launch Failure,App Crash & Launch Failure,2025-05,2,333.33,750.0,750.0,6
-General App Feedback,Performance & Speed,2026-03,1,90.91,181.82,181.82,11
-General App Feedback,Performance & Speed,2026-02,8,380.95,814.29,814.29,21
-General App Feedback,Performance & Speed,2026-01,8,380.95,795.24,795.24,21
-General App Feedback,Performance & Speed,2025-12,4,266.67,593.33,593.33,15
-General App Feedback,Performance & Speed,2025-11,3,250.0,208.33,208.33,12
-General App Feedback,Performance & Speed,2025-10,9,409.09,340.91,340.91,22
-General App Feedback,Performance & Speed,2025-09,8,444.44,966.67,966.67,18
-General App Feedback,Performance & Speed,2025-06,8,444.44,250.0,250.0,18
-General App Feedback,Performance & Speed,2025-05,4,666.67,1766.67,1766.67,6
-Video & Streaming Playback,Video & Streaming Playback,2026-03,1,90.91,181.82,181.82,11
-Video & Streaming Playback,Video & Streaming Playback,2026-02,5,238.1,523.81,523.81,21
-Video & Streaming Playback,Video & Streaming Playback,2026-01,7,333.33,738.1,738.1,21
-Video & Streaming Playback,Video & Streaming Playback,2025-12,3,200.0,473.33,473.33,15
-Video & Streaming Playback,Video & Streaming Playback,2025-11,2,166.67,350.0,350.0,12
-Video & Streaming Playback,Video & Streaming Playback,2025-10,2,90.91,190.91,190.91,22
-Video & Streaming Playback,Video & Streaming Playback,2025-09,3,166.67,438.89,438.89,18
-Video & Streaming Playback,Video & Streaming Playback,2025-06,2,111.11,277.78,277.78,18
-Content & Features,Content & Features,2026-02,2,95.24,190.48,190.48,21
-Content & Features,Content & Features,2026-01,1,47.62,95.24,95.24,21
+Content & Features,Content & Features,2026-03,1,1000.0,2000.0,2000.0,1
+Content & Features,Content & Features,2026-02,2,333.33,666.67,666.67,6
+Content & Features,Content & Features,2026-01,1,52.63,105.26,105.26,19
 Content & Features,Content & Features,2025-12,1,66.67,133.33,133.33,15
-Content & Features,Content & Features,2025-06,2,111.11,222.22,222.22,18
-Download & Offline,Download & Offline,2026-02,1,47.62,95.24,95.24,21
-Download & Offline,Download & Offline,2025-10,1,45.45,113.64,113.64,22
-Subscription & Billing,Subscription & Billing,2026-02,3,142.86,314.29,314.29,21
-Subscription & Billing,Subscription & Billing,2026-01,3,142.86,357.14,357.14,21
-Subscription & Billing,Subscription & Billing,2025-12,4,266.67,546.67,546.67,15
-Subscription & Billing,Subscription & Billing,2025-11,4,333.33,1333.33,1333.33,12
-Subscription & Billing,Subscription & Billing,2025-10,7,318.18,654.55,654.55,22
-Subscription & Billing,Subscription & Billing,2025-09,2,111.11,305.56,305.56,18
-Subscription & Billing,Subscription & Billing,2025-06,3,166.67,333.33,333.33,18
-Account & Login,Account & Login,2026-01,1,47.62,95.24,95.24,21
-Privacy & Security,Privacy & Security,2025-12,1,66.67,133.33,133.33,15
-Performance & Speed,Performance & Speed,2025-11,1,83.33,208.33,208.33,12
-Performance & Speed,Performance & Speed,2025-10,3,136.36,340.91,340.91,22
-Performance & Speed,Performance & Speed,2025-06,2,111.11,250.0,250.0,18
-Customer Support,Customer Support,2025-09,1,55.56,111.11,111.11,18
+Content & Features,Content & Features,2025-09,2,76.92,153.85,153.85,26
+Content & Features,Content & Features,2025-06,4,363.64,772.73,772.73,11
+Content & Features,Content & Features,2025-04,2,80.0,180.0,180.0,25
+General App Feedback,Performance & Speed,2026-02,2,333.33,666.67,666.67,6
+General App Feedback,Performance & Speed,2026-01,8,421.05,842.11,842.11,19
+General App Feedback,Performance & Speed,2025-12,7,466.67,133.33,133.33,15
+General App Feedback,Performance & Speed,2025-11,9,562.5,1212.5,1212.5,16
+General App Feedback,Performance & Speed,2025-10,8,400.0,100.0,100.0,20
+General App Feedback,Performance & Speed,2025-09,5,192.31,76.92,76.92,26
+General App Feedback,Performance & Speed,2025-06,1,90.91,181.82,181.82,11
+General App Feedback,Performance & Speed,2025-05,18,620.69,86.21,86.21,29
+General App Feedback,Performance & Speed,2025-04,6,240.0,520.0,520.0,25
+Video & Streaming Playback,Video & Streaming Playback,2026-02,2,333.33,750.0,750.0,6
+Video & Streaming Playback,Video & Streaming Playback,2026-01,1,52.63,105.26,105.26,19
+Video & Streaming Playback,Video & Streaming Playback,2025-12,2,133.33,300.0,300.0,15
+Video & Streaming Playback,Video & Streaming Playback,2025-11,4,250.0,562.5,562.5,16
+Video & Streaming Playback,Video & Streaming Playback,2025-10,5,250.0,550.0,550.0,20
+Video & Streaming Playback,Video & Streaming Playback,2025-09,5,192.31,419.23,419.23,26
+Video & Streaming Playback,Video & Streaming Playback,2025-06,2,181.82,363.64,363.64,11
+Video & Streaming Playback,Video & Streaming Playback,2025-05,6,206.9,431.03,431.03,29
+Video & Streaming Playback,Video & Streaming Playback,2025-04,3,120.0,240.0,240.0,25
+Subscription & Billing,Subscription & Billing,2026-01,7,368.42,763.16,763.16,19
+Subscription & Billing,Subscription & Billing,2025-12,2,133.33,266.67,266.67,15
+Subscription & Billing,Subscription & Billing,2025-11,2,125.0,437.5,437.5,16
+Subscription & Billing,Subscription & Billing,2025-10,4,200.0,475.0,475.0,20
+Subscription & Billing,Subscription & Billing,2025-09,9,346.15,842.31,842.31,26
+Subscription & Billing,Subscription & Billing,2025-06,2,181.82,363.64,363.64,11
+Subscription & Billing,Subscription & Billing,2025-05,2,68.97,162.07,162.07,29
+Subscription & Billing,Subscription & Billing,2025-04,7,280.0,640.0,640.0,25
+App Crash & Launch Failure,App Crash & Launch Failure,2026-01,2,105.26,289.47,289.47,19
+App Crash & Launch Failure,App Crash & Launch Failure,2025-11,1,62.5,125.0,125.0,16
+App Crash & Launch Failure,App Crash & Launch Failure,2025-09,3,115.38,288.46,288.46,26
+App Crash & Launch Failure,App Crash & Launch Failure,2025-06,1,90.91,181.82,181.82,11
+App Crash & Launch Failure,App Crash & Launch Failure,2025-05,1,34.48,68.97,68.97,29
+App Crash & Launch Failure,App Crash & Launch Failure,2025-04,1,40.0,80.0,80.0,25
+App Crash & Launch Failure,App Crash & Launch Failure,2025-03,1,1000.0,2500.0,2500.0,1
+Performance & Speed,Performance & Speed,2025-12,1,66.67,133.33,133.33,15
+Performance & Speed,Performance & Speed,2025-10,1,50.0,100.0,100.0,20
+Performance & Speed,Performance & Speed,2025-09,1,38.46,76.92,76.92,26
+Performance & Speed,Performance & Speed,2025-06,1,90.91,181.82,181.82,11
+Performance & Speed,Performance & Speed,2025-05,1,34.48,86.21,86.21,29
+UI & Navigation,UI & Navigation,2025-12,1,66.67,133.33,133.33,15
+UI & Navigation,UI & Navigation,2025-04,1,40.0,80.0,80.0,25
+Bugs & Technical Errors,Bugs & Technical Errors,2025-12,1,66.67,133.33,133.33,15
+Download & Offline,Download & Offline,2025-10,2,100.0,200.0,200.0,20
+Download & Offline,Download & Offline,2025-04,2,80.0,160.0,160.0,25
+Account & Login,Account & Login,2025-09,1,38.46,84.62,84.62,26
+Account & Login,Account & Login,2025-05,1,34.48,68.97,68.97,29
+Account & Login,Account & Login,2025-04,3,120.0,280.0,280.0,25
