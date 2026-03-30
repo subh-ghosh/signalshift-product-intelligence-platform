@@ -1,8 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import List
 import pandas as pd
 import os
+import io
 
 from app.services.csv_processor import process_uploaded_csv
 from app.services.data_sync_service import DataSyncService
@@ -55,6 +57,8 @@ def health():
 
 @router.post("/analyze-review")
 def analyze_review(request: ReviewRequest):
+    if ml_service is None:
+        return {"error": "ML service not initialized. Please upload data first."}
     result = ml_service.analyze_review(request.review)
     return result
 
@@ -65,6 +69,8 @@ def analyze_review(request: ReviewRequest):
 
 @router.post("/analyze-batch")
 def analyze_batch(request: BatchReviewRequest):
+    if ml_service is None:
+        return {"error": "ML service not initialized. Please upload data first."}
     results = []
     for review in request.reviews:
         result = ml_service.analyze_review(review)
@@ -81,6 +87,8 @@ def analyze_batch(request: BatchReviewRequest):
 
 @router.post("/detect-issues")
 def detect_issues(request: BatchReviewRequest):
+    if ml_service is None:
+        return {"error": "ML service not initialized. Please upload data first."}
     issues = ml_service.detect_issues(request.reviews)
     return {
         "total_reviews": len(request.reviews),
@@ -95,9 +103,14 @@ def detect_issues(request: BatchReviewRequest):
 def get_dashboard_dataset():
     uploaded = "data/processed/uploaded_reviews.csv"
     cleaned = "data/processed/cleaned_reviews.csv"
-    if os.path.exists(uploaded):
-        return pd.read_csv(uploaded)
-    return pd.read_csv(cleaned)
+    try:
+        if os.path.exists(uploaded):
+            return pd.read_csv(uploaded)
+        elif os.path.exists(cleaned):
+            return pd.read_csv(cleaned)
+    except Exception as e:
+        print(f"Dashboard dataset missing or corrupted: {e}")
+    return pd.DataFrame()
 
 
 # -----------------------------
@@ -199,8 +212,10 @@ def top_issues(limit_months: int = 0):
                 else:
                     metric_col = "mentions"
                 
-                # Apply the noise floor
-                valid_curr_topics = curr_win[curr_win >= 15].index
+                # Apply the dynamically scaled noise floor (5% volume or min 2)
+                total_window_mentions = curr_win.sum()
+                dynamic_threshold = max(2, int(total_window_mentions * 0.05)) if limit_months > 0 else 15
+                valid_curr_topics = curr_win[curr_win >= dynamic_threshold].index
                 
                 # Peak rate in the window
                 curr_rate = ts_df[
@@ -430,11 +445,16 @@ def trending_issues(limit_months: int = 0, metric: str = "severity"):
         # First, establish a noise floor.
         # An issue must have at least 15 raw mentions in the window to be
         # considered statistically significant enough for Top 5 ranking.
-        valid_topics = (
+        valid_topics_series = (
             window_df.groupby("issue_label")["mentions"]
             .sum()
         )
-        valid_topics = valid_topics[valid_topics >= 15].index
+        
+        # Dynamically scale noise floor based on available total volume in the window
+        total_window_mentions = window_df["mentions"].sum()
+        dynamic_threshold = max(2, int(total_window_mentions * 0.05)) if limit_months > 0 else 15
+        
+        valid_topics = valid_topics_series[valid_topics_series >= dynamic_threshold].index
         
         peak_velocity = (
             window_df[window_df["issue_label"].isin(valid_topics)]
@@ -1010,7 +1030,7 @@ def dashboard_kpis(limit_months: int = 0):
 # -----------------------------
 
 @router.get("/dashboard/sentiment-stability")
-def get_sentiment_stability():
+def get_sentiment_stability(limit_months: int = 0):
     """Calculates app-wide sentiment stability using Bollinger bands."""
     try:
         ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
@@ -1020,7 +1040,6 @@ def get_sentiment_stability():
         severity_map = topic_analysis.set_index("label")["avg_severity"].to_dict()
         
         # Aggregate sentiment per month
-        # Avg Severity per month = Sum(mentions * topic_severity) / Sum(mentions)
         months = sorted(ts_df["month"].unique())
         stability_data = []
         
@@ -1048,6 +1067,10 @@ def get_sentiment_stability():
         
         # High volatility = score is outside the bands
         df["is_volatile"] = (df["score"] > df["upper_band"]) | (df["score"] < df["lower_band"])
+        
+        # Filter to requested time window
+        if limit_months > 0:
+            df = df.tail(limit_months)
         
         return df.to_dict(orient="records")
     except Exception as e:
@@ -1362,12 +1385,16 @@ def _process_reviews_job(df: pd.DataFrame):
 # Upload Reviews CSV
 # -----------------------------
 
+# io and run_in_threadpool imported at file top
+
 @router.post("/upload-reviews")
-def upload_reviews(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_reviews(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     if ml_service is None:
         return {"error": "ML service not initialized"}
 
-    df = pd.read_csv(file.file)
+    content = await file.read()
+    # Processing heavy pandas CSV parsing in a worker thread
+    df = await run_in_threadpool(pd.read_csv, io.BytesIO(content))
     possible_columns = ["content", "review", "text", "comment"]
     review_column = None
     for col in possible_columns:

@@ -11,17 +11,16 @@ export default function TrendingChart({ range, setRange }) {
     const [filteredData, setFilteredData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [keys, setKeys] = useState([]);
-    const [showBands, setShowBands] = useState(true);
-    const [showForecast, setShowForecast] = useState(true);
+    const [showBands, setShowBands] = useState(false);
+    const [showForecast, setShowForecast] = useState(false);
     const [activeMetric, setActiveMetric] = useState("severity"); // "severity" or "revenue"
 
     const sliceData = (selectedRange, data = allData) => {
         if (!data.length) return;
-        let sliced = [...data];
-        if (selectedRange === "3M") sliced = data.slice(-3);
-        else if (selectedRange === "6M") sliced = data.slice(-6);
-        else if (selectedRange === "12M") sliced = data.slice(-12);
-        setFilteredData(sliced);
+        // The backend already filters the data accurately by limit_months.
+        // We do not need to slice it again (which incorrectly truncates data because 
+        // of the appended forecast row).
+        setFilteredData([...data]);
     };
 
     const fetchTrendingData = async () => {
@@ -181,27 +180,7 @@ export default function TrendingChart({ range, setRange }) {
                         >BUSINESS IMPACT</button>
                     </div>
 
-                    {/* Checkboxes */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "16px", borderLeft: "1px solid #CBD5E1", paddingLeft: "16px" }}>
-                        <label title="Show expected range for mentions (Variance Band)" style={{ fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 600 }}>
-                            <input
-                                type="checkbox"
-                                checked={showBands}
-                                onChange={(e) => setShowBands(e.target.checked)}
-                                style={{ accentColor: '#3B82F6', width: '14px', height: '14px' }}
-                            />
-                            Normal Pattern
-                        </label>
-                        <label title="Show predicted trends based on historical data" style={{ fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 600 }}>
-                            <input
-                                type="checkbox"
-                                checked={showForecast}
-                                onChange={(e) => setShowForecast(e.target.checked)}
-                                style={{ accentColor: '#F59E0B', width: '14px', height: '14px' }}
-                            />
-                            Future Estimate
-                        </label>
-                    </div>
+
                 </div>
             </div>
 

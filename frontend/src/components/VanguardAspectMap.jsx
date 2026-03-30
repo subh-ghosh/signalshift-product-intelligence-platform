@@ -18,7 +18,7 @@ const VanguardAspectMap = ({ range, onAspectClick }) => {
     const fetchAspects = async () => {
         setLoading(true);
         try {
-            const limitMonths = range === "3M" ? 3 : range === "6M" ? 6 : range === "12M" ? 12 : 3;
+            const limitMonths = range === "3M" ? 3 : range === "6M" ? 6 : range === "12M" ? 12 : 0;
             const res = await api.get("/dashboard/aspects", { params: { limit_months: limitMonths } });
             setData(res.data || []);
         } catch (err) {

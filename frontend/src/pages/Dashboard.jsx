@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import api from "../services/api"
 
 import SentimentChart from "../components/SentimentChart"
@@ -115,7 +115,12 @@ export default function Dashboard() {
         checkInitialStatus()
     }, [])
 
-    let progressInterval
+    const progressInterval = useRef(null)
+    useEffect(() => {
+        return () => {
+            if (progressInterval.current) clearInterval(progressInterval.current)
+        }
+    }, [])
 
     const onAnalysisComplete = (finalStatus = "Success! Analysis complete.") => {
         setUploadLoading(false)
@@ -129,21 +134,21 @@ export default function Dashboard() {
     }
 
     const startPolling = async () => {
-        if (progressInterval) clearInterval(progressInterval)
+        if (progressInterval.current) clearInterval(progressInterval.current)
         return new Promise((resolve, reject) => {
             let failCount = 0
-            progressInterval = setInterval(async () => {
+            progressInterval.current = setInterval(async () => {
                 try {
                     const res = await api.get("/upload-progress")
                     setProgress(res.data)
                     failCount = 0
                     if (res.data.status === "complete" || res.data.status === "idle") {
-                        clearInterval(progressInterval)
+                        clearInterval(progressInterval.current)
                         onAnalysisComplete(res.data.status === "complete" ? "Analysis complete!" : "")
                         resolve()
                     }
                     if (res.data.status === "error") {
-                        clearInterval(progressInterval)
+                        clearInterval(progressInterval.current)
                         setUploadLoading(false)
                         setStatus("Analysis failed")
                         reject(new Error("Analysis failed"))
@@ -151,7 +156,7 @@ export default function Dashboard() {
                 } catch (e) {
                     failCount++
                     if (failCount > 5) {
-                        clearInterval(progressInterval)
+                        clearInterval(progressInterval.current)
                         setUploadLoading(false)
                         setStatus("Connection lost")
                         reject(new Error("Connection lost"))
@@ -245,6 +250,7 @@ export default function Dashboard() {
             document.body.appendChild(link)
             link.click()
             link.remove()
+            setTimeout(() => window.URL.revokeObjectURL(url), 100)
             setStatus("CSV downloaded!")
             setTimeout(() => setStatus(""), 3000)
         } catch (e) {
@@ -268,6 +274,7 @@ export default function Dashboard() {
             document.body.appendChild(link)
             link.click()
             link.remove()
+            setTimeout(() => window.URL.revokeObjectURL(url), 100)
             setStatus("Report downloaded!")
             setTimeout(() => setStatus(""), 3000)
         } catch (e) {
@@ -344,29 +351,6 @@ export default function Dashboard() {
                 <div className="glass-card" style={{ marginBottom: "40px" }}>
                     <h2 style={{ marginTop: 0, color: "#0F172A" }}>Main Customer Complaints</h2>
                     <TopIssuesChart key={`issues-${refreshKey}-${range}`} onIssueClick={handleIssueClick} limitMonths={limitMonths} />
-                </div>
-
-                {/* ── 4. ADVANCED ANALYTICS (The Hidden Details) ── */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "20px", marginTop: "30px", marginBottom: "40px" }}>
-                    <div className="glass-card">
-                        <h2 style={{ marginTop: 0, color: "#0F172A" }}>🛡️ Overall Happiness Trend</h2>
-                        <p style={{ fontSize: "13px", color: "#64748B", marginBottom: "20px" }}>
-                            Tracking app-wide sentiment fluctuations over time.
-                        </p>
-                        <SentimentStabilityChart
-                            key={`stability-${refreshKey}-${range}`}
-                            limitMonths={limitMonths}
-                            onStabilityClick={(m) => openDrawer({ month: m })}
-                        />
-                    </div>
-                    <div className="glass-card">
-                        <h2 style={{ marginTop: 0, color: "#0F172A" }}>⚠️ Trending Topics</h2>
-                        <EmergingIssuesPanel key={`emerge-${refreshKey}-${range}`} limitMonths={limitMonths} />
-                    </div>
-                    <div className="glass-card">
-                        <h2 style={{ marginTop: 0, color: "#0F172A" }}>📈 New Issues Hiding in Old Topics</h2>
-                        <SemanticDriftPanel key={`drift-${refreshKey}-${range}`} limitMonths={limitMonths} />
-                    </div>
                 </div>
 
                 {/* ── 5. RAW EVIDENCE (The Proof) ── */}
@@ -471,6 +455,29 @@ export default function Dashboard() {
                         </div>
                     </div>
                 )}
+
+                {/* ── 4. ADVANCED ANALYTICS (The Hidden Details) ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "20px", marginTop: "30px", marginBottom: "40px" }}>
+                    <div className="glass-card">
+                        <h2 style={{ marginTop: 0, color: "#0F172A" }}>🛡️ Overall Happiness Trend</h2>
+                        <p style={{ fontSize: "13px", color: "#64748B", marginBottom: "20px" }}>
+                            Tracking app-wide sentiment fluctuations over time.
+                        </p>
+                        <SentimentStabilityChart
+                            key={`stability-${refreshKey}-${range}`}
+                            limitMonths={limitMonths}
+                            onStabilityClick={(m) => openDrawer({ month: m })}
+                        />
+                    </div>
+                    <div className="glass-card">
+                        <h2 style={{ marginTop: 0, color: "#0F172A" }}>⚠️ Trending Topics</h2>
+                        <EmergingIssuesPanel key={`emerge-${refreshKey}-${range}`} limitMonths={limitMonths} />
+                    </div>
+                    <div className="glass-card">
+                        <h2 style={{ marginTop: 0, color: "#0F172A" }}>📈 New Issues Hiding in Old Topics</h2>
+                        <SemanticDriftPanel key={`drift-${refreshKey}-${range}`} limitMonths={limitMonths} />
+                    </div>
+                </div>
 
                 {/* ── 6. DATA MANAGEMENT (The Admin) ── */}
                 <div style={{ 

@@ -22,10 +22,10 @@ const SentimentStabilityChart = ({ limitMonths = 0, onStabilityClick }) => {
         const fetchStability = async () => {
             setLoading(true);
             try {
-                const res = await api.get("/dashboard/sentiment-stability");
-                const rawData = res.data || [];
-                const displayData = limitMonths > 0 ? rawData.slice(-limitMonths) : rawData;
-                setData(displayData);
+                const res = await api.get("/dashboard/sentiment-stability", {
+                    params: { limit_months: limitMonths }
+                });
+                setData(res.data || []);
             } catch (err) {
                 console.error("Stability Chart Error:", err);
             } finally {

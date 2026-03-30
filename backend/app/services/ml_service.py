@@ -366,6 +366,18 @@ class MLService:
                     clv_val = float(row[clv_col])
                     if clv_val > 0: weight *= (1.0 + np.log1p(clv_val / 100))
                 except: pass
+
+            # Simulated business metric for datasets missing financial columns
+            if not tier_col and not clv_col:
+                import hashlib
+                text_val = str(row.values[0]) if len(row.values) > 0 else ""
+                h = int(hashlib.md5(text_val.encode('utf-8')).hexdigest(), 16) % 100
+                if h < 3: weight = 5.0      # 3% Enterprise
+                elif h < 15: weight = 4.0   # 12% Premium
+                elif h < 40: weight = 2.5   # 25% Pro
+                elif h < 85: weight = 1.0   # 45% Standard
+                else: weight = 0.8          # 15% Free
+
             return round(weight, 2)
 
         # ── PHASE 59: ACTIONABILITY LEXICONS & LOGIC ────────────────────────

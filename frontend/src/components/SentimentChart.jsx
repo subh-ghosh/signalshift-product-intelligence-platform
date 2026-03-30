@@ -28,7 +28,15 @@ export default function SentimentChart({ limitMonths = 0, onSentimentClick }) {
   if (loading) return <SkeletonChart height={300} />
 
   const total = data.reduce((s, d) => s + d.value, 0)
-  const posPct = total > 0 ? Math.round((data[0].value / total) * 100) : 0
+
+  if (total === 0) return (
+    <div style={{ textAlign: "center", padding: "40px 20px" }}>
+      <div style={{ fontSize: "28px", marginBottom: "12px", opacity: 0.8 }}>📊</div>
+      <p style={{ color: "#64748B", fontSize: "14px", margin: 0 }}>No sentiment data available for this time period.</p>
+    </div>
+  )
+
+  const posPct = Math.round((data[0].value / total) * 100)
 
   return (
     <div style={{ position: "relative", width: "100%", height: "300px", display: "flex", justifyContent: "center" }}>

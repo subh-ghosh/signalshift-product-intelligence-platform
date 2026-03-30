@@ -122,7 +122,17 @@ export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
     return b.mentions - a.mentions
   })
 
-  if (!data.length) {
+  // Calculate what the currently active metric key is
+  const activeKey = sortByRevenue && sortedData.some(d => d.revenue_risk !== null && d.revenue_risk !== undefined)
+    ? "revenue_risk"
+    : "mentions"
+
+  // Only show bars that are at least 2% of the max value, so we don't render
+  // invisible 1-2 mention bars that destroy the visual scale on short timeframes.
+  const maxVal = Math.max(...sortedData.map(d => d[activeKey] || 0), 1)
+  const visibleData = sortedData.filter(d => (d[activeKey] || 0) >= maxVal * 0.02)
+
+  if (!visibleData.length) {
     return <p style={{ color: "#64748B", padding: "20px 0", fontWeight: 500 }}>No specific high-signal issues detected in this window.</p>
   }
 
@@ -178,7 +188,7 @@ export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
 
       <ResponsiveContainer height={380}>
         <BarChart
-          data={sortedData}
+          data={visibleData}
           layout="vertical"
           margin={{ top: 10, right: 30, left: 20, bottom: 10 }}
         >
@@ -194,19 +204,19 @@ export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
             type="category"
             dataKey="issue"
             width={220}
-            tick={<VelocityTick data={sortedData} />}
+            tick={<VelocityTick data={visibleData} />}
             axisLine={false}
             tickLine={false}
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: "#F8FAFC" }} />
           <Bar
-            dataKey={sortByRevenue && sortedData.some(d => d.revenue_risk !== null && d.revenue_risk !== undefined) ? "revenue_risk" : "mentions"}
+            dataKey={activeKey}
             radius={[0, 6, 6, 0]} /* Rounded edges for premium feel */
             onClick={(entry) => handleClick(entry)}
             cursor="pointer"
             barSize={20}
           >
-            {sortedData.map((entry, index) => (
+            {visibleData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
                 fill={severityColor(entry.avg_severity || 0)}

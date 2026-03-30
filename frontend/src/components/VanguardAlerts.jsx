@@ -8,7 +8,7 @@ const VanguardAlerts = ({ range }) => {
     const fetchAlerts = async () => {
         setLoading(true);
         try {
-            const limitMonths = range === "3M" ? 3 : range === "6M" ? 6 : range === "12M" ? 12 : 3;
+            const limitMonths = range === "3M" ? 3 : range === "6M" ? 6 : range === "12M" ? 12 : 0;
             const res = await api.get("/dashboard/intelligence-alerts", { params: { limit_months: limitMonths } });
             setAlerts(res.data.alerts || []);
         } catch (err) {
