@@ -1,51 +1,86 @@
 import { useNavigate } from "react-router-dom"
 
+const previewHeights = ["42%", "66%", "88%", "70%", "84%", "62%", "44%"]
+
 export default function Home() {
-    const navigate = useNavigate()
+  const navigate = useNavigate()
 
-    const selectApp = () => {
-        navigate("/login")
-    }
-
-    return (
-        <div style={{
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            textAlign: 'center',
-            padding: '20px'
-        }}>
-            <h1 style={{ fontSize: '4rem', marginBottom: '0' }}>SignalShift</h1>
-            <p style={{ color: '#888', fontSize: '1.2rem', maxWidth: '600px', marginBottom: '50px' }}>
-                Advanced Customer Insights & Growth Prediction System.
-            </p>
-
-            <div className="glass-card" style={{ 
-                maxWidth: '400px', 
-                cursor: 'pointer',
-                transition: 'transform 0.3s ease'
-            }} onClick={selectApp}>
-                <div style={{ 
-                    height: '200px', 
-                    background: 'url("https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=400&q=80")',
-                    backgroundSize: 'cover',
-                    borderRadius: '8px',
-                    marginBottom: '20px'
-                }} />
-                <h2 style={{ margin: '0' }}>Netflix Analysis</h2>
-                <p style={{ color: '#666', fontSize: '14px', marginTop: '10px' }}>
-                    Monitor sentiment, detect technical issues, and improve retention with ABSA technology.
-                </p>
-                <button className="btn-primary" style={{ width: '100%', marginTop: '20px' }}>
-                    Enter Dashboard
+  return (
+    <div className="home-shell">
+      <section className="hero-surface">
+        <div className="home-layout">
+          <div className="page-grid">
+            <div className="panel panel--muted">
+              <div className="panel__eyebrow">Customer Intelligence Platform</div>
+              <h1 className="hero-lead">Turn feedback noise into product direction.</h1>
+              <p className="hero-copy">
+                SignalShift surfaces sentiment shifts, emerging complaints, and executive-ready
+                narratives in one premium workspace. The experience is now built to feel like a
+                modern analytics product from first click to final report.
+              </p>
+              <div className="cta-row">
+                <button className="btn-primary" onClick={() => navigate("/login")}>
+                  Open Workspace
                 </button>
+                <button className="btn-secondary" onClick={() => navigate("/dashboard")}>
+                  Jump to Dashboard
+                </button>
+              </div>
             </div>
 
-            <p style={{ marginTop: '40px', fontSize: '12px', color: '#444' }}>
-                SignalShift Research V2.0 | Powered by SignalShiftBERT
-            </p>
+            <div className="surface-grid surface-grid--2">
+              <div className="panel panel--tight">
+                <div className="status-badge is-positive">Live sentiment tracking</div>
+                <p className="panel__text" style={{ marginTop: 14 }}>
+                  Continuous analysis, rapid alerting, and clean executive summaries for product
+                  and CX teams.
+                </p>
+              </div>
+              <div className="panel panel--tight">
+                <div className="status-badge is-warning">Retention intelligence</div>
+                <p className="panel__text" style={{ marginTop: 14 }}>
+                  Spot the issues customers feel first, then export structured evidence and
+                  explainable reporting.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="panel dashboard-preview">
+            <div className="panel__header">
+              <div>
+                <div className="panel__eyebrow">Preview</div>
+                <h2 className="panel__title panel__title--section">Income-style insight canvas</h2>
+                <p className="panel__text">
+                  A softer dashboard shell, elevated cards, and a clearer story around momentum,
+                  critical signals, and review evidence.
+                </p>
+              </div>
+              <div className="status-badge">Workspace v3</div>
+            </div>
+
+            <div className="feature-card feature-card--highlight">
+              <div className="surface-grid surface-grid--2" style={{ alignItems: "end" }}>
+                <div>
+                  <div className="panel__eyebrow">Momentum</div>
+                  <div className="panel__title panel__title--section">+24%</div>
+                  <p className="panel__text">Positive sentiment is tracking above the trailing quarter.</p>
+                </div>
+                <div className="feature-card__cta">
+                  <span className="muted">Weekly product pulse</span>
+                  <strong className="mono">$2.6k</strong>
+                </div>
+              </div>
+
+              <div className="preview-bars">
+                {previewHeights.map((height, index) => (
+                  <span key={index} style={{ height }} />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-    )
+      </section>
+    </div>
+  )
 }
