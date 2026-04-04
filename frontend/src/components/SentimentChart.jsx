@@ -1,10 +1,15 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts"
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 import { useEffect, useState } from "react"
 import api from "../services/api"
 import { SkeletonChart } from "./Skeleton"
 
-// Clean Light Theme Colors: Emerald for Positive, Rose for Negative
-const COLORS = ["#10B981", "#EF4444"]
+const COLORS = ["#31b57e", "#ea5b57"]
+
+function getMomentumMeta(momentum) {
+  if (momentum > 1) return { label: `Improving ${Math.abs(momentum)} pts`, color: "#31b57e", background: "rgba(49, 181, 126, 0.12)" }
+  if (momentum < -1) return { label: `Declining ${Math.abs(momentum)} pts`, color: "#ea5b57", background: "rgba(234, 91, 87, 0.12)" }
+  return { label: "Holding steady", color: "#72788c", background: "rgba(114, 120, 140, 0.12)" }
+}
 
 export default function SentimentChart({ limitMonths = 0, onSentimentClick }) {
   const [data, setData] = useState([])
@@ -12,12 +17,11 @@ export default function SentimentChart({ limitMonths = 0, onSentimentClick }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
     api.get("/dashboard/sentiment", { params: { limit_months: limitMonths } })
-      .then(res => {
+      .then((res) => {
         setData([
           { name: "Positive", value: res.data.positive },
-          { name: "Negative", value: res.data.negative }
+          { name: "Negative", value: res.data.negative },
         ])
         setMomentum(res.data.momentum || 0)
       })
@@ -27,94 +31,95 @@ export default function SentimentChart({ limitMonths = 0, onSentimentClick }) {
 
   if (loading) return <SkeletonChart height={300} />
 
-  const total = data.reduce((s, d) => s + d.value, 0)
+  const total = data.reduce((sum, item) => sum + item.value, 0)
 
-  if (total === 0) return (
-    <div style={{ textAlign: "center", padding: "40px 20px" }}>
-      <div style={{ fontSize: "28px", marginBottom: "12px", opacity: 0.8 }}>📊</div>
-      <p style={{ color: "#64748B", fontSize: "14px", margin: 0 }}>No sentiment data available for this time period.</p>
-    </div>
-  )
+  if (total === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "40px 20px" }}>
+        <div style={{ fontSize: "28px", marginBottom: "12px", opacity: 0.8 }}>📊</div>
+        <p style={{ color: "#72788c", fontSize: "14px", margin: 0 }}>No sentiment data available for this time period.</p>
+      </div>
+    )
+  }
 
-  const posPct = Math.round((data[0].value / total) * 100)
+  const positive = data[0].value
+  const negative = data[1].value
+  const positivePct = Math.round((positive / total) * 100)
+  const negativePct = 100 - positivePct
+  const momentumMeta = getMomentumMeta(momentum)
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "300px", display: "flex", justifyContent: "center" }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            outerRadius={100}
-            innerRadius={75}
-            paddingAngle={2} // Tighter padding for a cleaner look
-            stroke="none"
-            onClick={(data) => onSentimentClick && onSentimentClick(data.name.toLowerCase())}
-            style={{ cursor: onSentimentClick ? 'pointer' : 'default', outline: 'none' }}
-          >
-            {data.map((entry, i) => (
-              <Cell
-                key={i}
-                fill={COLORS[i]}
-                style={{
-                  transition: 'all 0.2s ease'
-                  // Removed the heavy neon drop-shadow
+    <div className="sentiment-scorecard">
+      <div className="sentiment-scorecard__topline">
+        <div>
+          <div className="sentiment-scorecard__eyebrow">Current health</div>
+          <div className="sentiment-scorecard__headline">{positivePct}% positive sentiment</div>
+          <div className="sentiment-scorecard__copy">Negative sentiment accounts for {negativePct}% of the active review window.</div>
+        </div>
+        <span className="sentiment-scorecard__momentum" style={{ color: momentumMeta.color, background: momentumMeta.background }}>
+          {momentumMeta.label}
+        </span>
+      </div>
+
+      <div className="sentiment-scorecard__body">
+        <div className="sentiment-scorecard__chart">
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                outerRadius={84}
+                innerRadius={62}
+                paddingAngle={2}
+                stroke="none"
+              >
+                {data.map((entry, index) => (
+                  <Cell key={entry.name} fill={COLORS[index]} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value) => [`${value.toLocaleString()} reviews`, "Count"]}
+                contentStyle={{
+                  background: "#FFFFFF",
+                  border: "1px solid rgba(91, 100, 121, 0.12)",
+                  borderRadius: "12px",
+                  color: "#262c3f",
+                  boxShadow: "0 8px 18px rgba(49, 57, 77, 0.08)",
+                  fontSize: "13px",
+                  fontWeight: 600,
                 }}
+                itemStyle={{ color: "#262c3f", fontWeight: "700" }}
               />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value) => [`${value.toLocaleString()} reviews`, "Count"]}
-            contentStyle={{
-              background: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              borderRadius: "8px",
-              color: "#0F172A",
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
-              fontSize: '13px',
-              fontWeight: 600
-            }}
-            itemStyle={{ color: "#0F172A", fontWeight: "700" }}
-          />
-          <Legend
-            verticalAlign="bottom"
-            height={36}
-            iconType="circle"
-            wrapperStyle={{ color: "#475569", fontSize: "13px", fontWeight: "600" }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+            </PieChart>
+          </ResponsiveContainer>
 
-      {/* Center Momentum & Percentage Indicator */}
-      <div style={{
-        position: "absolute",
-        top: "45%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        textAlign: "center",
-        pointerEvents: "none"
-      }}>
-        <div style={{ fontSize: "36px", fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>
-          {posPct}%
-        </div>
-        <div style={{ fontSize: "11px", color: "#64748B", fontWeight: 600, textTransform: "uppercase", marginTop: "6px", letterSpacing: "0.05em" }}>
-          Positive Feedback
+          <div className="sentiment-scorecard__center">
+            <strong>{positivePct}%</strong>
+            <span>Positive</span>
+          </div>
         </div>
 
-        {/* Clean Pill Momentum Badge */}
-        <div title="Change in positive sentiment compared to the previous period" style={{
-          marginTop: "8px",
-          fontSize: "12px",
-          fontWeight: 700,
-          color: momentum >= 0 ? "#10B981" : "#EF4444",
-          background: momentum >= 0 ? "#ECFDF5" : "#FEF2F2",
-          padding: "4px 10px",
-          borderRadius: "12px",
-          display: "inline-block",
-          pointerEvents: "auto"
-        }}>
-          {momentum >= 0 ? '↑' : '↓'} {Math.abs(momentum)}%
+        <div className="sentiment-scorecard__side">
+          <div className="sentiment-scorecard__stats">
+            <div className="sentiment-stat">
+              <span className="sentiment-stat__label">Positive reviews</span>
+              <strong>{positive.toLocaleString()}</strong>
+            </div>
+            <div className="sentiment-stat">
+              <span className="sentiment-stat__label">Negative reviews</span>
+              <strong>{negative.toLocaleString()}</strong>
+            </div>
+          </div>
+
+          <div className="sentiment-scorecard__actions">
+            <button type="button" className="sentiment-action sentiment-action--positive" onClick={() => onSentimentClick && onSentimentClick("positive")}>
+              View Positive Feedback
+            </button>
+            <button type="button" className="sentiment-action sentiment-action--negative" onClick={() => onSentimentClick && onSentimentClick("negative")}>
+              View Negative Feedback
+            </button>
+          </div>
         </div>
       </div>
     </div>

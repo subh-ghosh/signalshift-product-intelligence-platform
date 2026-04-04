@@ -1,5 +1,12 @@
 import { useNavigate } from "react-router-dom"
 import { useState } from "react"
+import AppShell from "../components/AppShell"
+
+const accessNotes = [
+  "Private workspace with review ingestion and export controls.",
+  "Built for operator briefings, incident response, and product trend reviews.",
+  "Demo account remains unchanged for this prototype.",
+]
 
 export default function Login() {
   const navigate = useNavigate()
@@ -20,115 +27,107 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-shell">
-      <section className="hero-surface">
-        <div className="auth-layout">
-          <aside className="auth-showcase">
-            <div className="page-grid">
-              <div className="app-brand">
-                <span className="app-brand__mark">S</span>
-                <span className="app-brand__text">
-                  <span className="app-brand__name">SignalShift</span>
-                  <span className="app-brand__meta">Private Workspace</span>
-                </span>
-              </div>
+    <AppShell activePath="/login" title="SignalShift" subtitle="Secure Operator Access" searchPlaceholder="Search help articles or workspace docs...">
+      <section className="route-frame hero-grid">
+        <div className="hero-card">
+          <div className="hero-card__content">
+            <div className="eyebrow">Manager Access</div>
+            <h1 className="hero-title">Sign in to the redesigned operations workspace.</h1>
+            <p className="hero-copy">
+              Use the private operator account to access the rebuilt dashboard, export controls, and live issue evidence from the current analysis run.
+            </p>
 
+            <div className="hero-metrics">
+              <div className="hero-mini-card">
+                <span>Demo Email</span>
+                <strong style={{ fontSize: "0.98rem" }}>netflix_admin@signalshift.com</strong>
+                <span>Manager account</span>
+              </div>
+              <div className="hero-mini-card">
+                <span>Security Key</span>
+                <strong>admin123</strong>
+                <span>Prototype credential</span>
+              </div>
+              <div className="hero-mini-card">
+                <span>Post-login</span>
+                <strong>Dashboard</strong>
+                <span>Insights workspace</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="utility-stack">
+          <div className="utility-card">
+            <div className="utility-card__title">
               <div>
-                <div className="panel__eyebrow">Manager access</div>
-                <h1 className="page-title" style={{ maxWidth: "11ch" }}>
-                  Enter the insight room.
-                </h1>
-                <p className="hero-copy">
-                  Authenticate into the premium monitoring workspace for live sentiment tracking,
-                  issue diagnostics, and export-ready reporting.
-                </p>
+                <h3>Authorize Session</h3>
+                <div className="section-kicker">Access card aligned with the new product shell.</div>
               </div>
+              <span className="tag tag--success">Private</span>
+            </div>
 
-              <div className="surface-grid surface-grid--2">
-                <div className="panel panel--tight">
-                  <div className="status-badge is-positive">Live alerts</div>
-                  <p className="panel__text" style={{ marginTop: 12 }}>
-                    Watch customer risk signals refresh in a calmer, cleaner product shell.
-                  </p>
-                </div>
-                <div className="panel panel--tight">
-                  <div className="status-badge">Reports</div>
-                  <p className="panel__text" style={{ marginTop: 12 }}>
-                    Export structured CSV and executive PDF briefs without leaving the dashboard.
-                  </p>
-                </div>
+            <div className="login-form">
+              <input
+                type="text"
+                placeholder="Admin Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="Security Key"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+
+              <div className="login-form__hint">Demo access is unchanged for this prototype.</div>
+
+              <div className="button-row" style={{ marginTop: 6 }}>
+                <button className="btn-primary" onClick={handleLogin}>
+                  Authorize Session
+                </button>
+                <button className="btn-secondary" onClick={() => navigate("/")}>
+                  Back Home
+                </button>
               </div>
             </div>
 
-            <div className="panel panel--muted">
-              <div className="panel__eyebrow">Demo credentials</div>
-              <div className="surface-grid surface-grid--2">
-                <div>
-                  <div className="muted" style={{ fontSize: "0.8rem", fontWeight: 700 }}>
-                    Email
-                  </div>
-                  <strong>netflix_admin@signalshift.com</strong>
-                </div>
-                <div>
-                  <div className="muted" style={{ fontSize: "0.8rem", fontWeight: 700 }}>
-                    Security key
-                  </div>
-                  <strong>admin123</strong>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          <div className="auth-panel">
-            <div>
-              <div className="panel__eyebrow">Authorized sign in</div>
-              <h2 className="panel__title panel__title--section">Workspace session</h2>
-              <p className="panel__text">
-                Use the current demo account to continue into the redesigned analytics suite.
+            {error && (
+              <p
+                className="status-text is-error"
+                style={{
+                  marginTop: 18,
+                  padding: "12px 14px",
+                  borderRadius: 16,
+                  background: "rgba(234, 90, 106, 0.08)",
+                  border: "1px solid rgba(234, 90, 106, 0.14)",
+                }}
+              >
+                {error}
               </p>
+            )}
+          </div>
+
+          <div className="utility-card">
+            <div className="utility-card__title">
+              <div>
+                <h3>Access Notes</h3>
+                <div className="section-kicker">What remains available in the new interface.</div>
+              </div>
             </div>
-
-            <div className="field-stack">
-              <label className="field-label">
-                Admin email
-                <span className="input-shell">
-                  <span aria-hidden="true">@</span>
-                  <input
-                    type="text"
-                    placeholder="name@company.com"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                  />
-                </span>
-              </label>
-
-              <label className="field-label">
-                Security key
-                <span className="input-shell">
-                  <span aria-hidden="true">•</span>
-                  <input
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                  />
-                </span>
-              </label>
+            <div className="info-list">
+              {accessNotes.map((item) => (
+                <div key={item} className="info-list__item">
+                  <div>
+                    <strong>{item}</strong>
+                  </div>
+                </div>
+              ))}
             </div>
-
-            <button className="btn-primary" onClick={handleLogin}>
-              Authorize session
-            </button>
-
-            <div className="auth-note">
-              Access is scoped to the current research workspace and preserves the existing demo
-              authentication flow.
-            </div>
-
-            {error ? <div className="auth-note error-note">{error}</div> : null}
           </div>
         </div>
       </section>
-    </div>
+    </AppShell>
   )
 }

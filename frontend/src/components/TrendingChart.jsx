@@ -1,285 +1,268 @@
 import React, { useState, useEffect } from "react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import api from "../services/api";
 import { SkeletonChart } from "./Skeleton";
 
-// Clean Light Theme Color Palette
-const COLORS = ["#3B82F6", "#8B5CF6", "#10B981", "#F59E0B", "#EF4444"];
+const COLORS = ["#4b78b4", "#7b8ce0", "#31b57e"];
 
-export default function TrendingChart({ range, setRange }) {
-    const [allData, setAllData] = useState([]);
-    const [filteredData, setFilteredData] = useState([]);
+function formatMetricValue(value, metric) {
+    const safeValue = Number(value || 0);
+    if (metric === "revenue") return `$${safeValue.toFixed(0)}`;
+    return `${Math.round(safeValue)}`;
+}
+
+function getTopicTrend(currentRow, prevRow, key) {
+    const current = Number(currentRow?.[key] || 0);
+    const previous = Number(prevRow?.[key] || 0);
+
+    if (!previous && current > 0) return { label: "New", tone: "cool" };
+    if (!previous && !current) return { label: "Stable", tone: "neutral" };
+
+    const pct = ((current - previous) / Math.max(previous, 1)) * 100;
+    if (pct > 10) return { label: "Rising", tone: "hot" };
+    if (pct < -10) return { label: "Cooling", tone: "good" };
+    return { label: "Stable", tone: "neutral" };
+}
+
+function toneStyles(tone) {
+    if (tone === "hot") return { color: "#ea5b57", background: "rgba(234, 91, 87, 0.12)" };
+    if (tone === "good") return { color: "#31b57e", background: "rgba(49, 181, 126, 0.12)" };
+    if (tone === "cool") return { color: "#4b78b4", background: "rgba(75, 120, 180, 0.12)" };
+    return { color: "#72788c", background: "rgba(114, 120, 140, 0.12)" };
+}
+
+function buildVisibleTopics(rows, keys) {
+    if (!rows.length || !keys.length) return [];
+    const lastActualIndex = rows.length - 1;
+    const currentRow = rows[lastActualIndex];
+    const prevRow = rows[Math.max(0, lastActualIndex - 1)];
+
+    return keys
+        .map((key) => ({
+            key,
+            currentValue: Number(currentRow?.[key] || 0),
+            prevValue: Number(prevRow?.[key] || 0),
+            trend: getTopicTrend(currentRow, prevRow, key),
+        }))
+        .sort((a, b) => b.currentValue - a.currentValue)
+        .slice(0, 3);
+}
+
+export default function TrendingChart({ range }) {
+    const [chartRows, setChartRows] = useState([]);
+    const [visibleTopics, setVisibleTopics] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [keys, setKeys] = useState([]);
-    const [showBands, setShowBands] = useState(false);
-    const [showForecast, setShowForecast] = useState(false);
-    const [activeMetric, setActiveMetric] = useState("severity"); // "severity" or "revenue"
-
-    const sliceData = (selectedRange, data = allData) => {
-        if (!data.length) return;
-        // The backend already filters the data accurately by limit_months.
-        // We do not need to slice it again (which incorrectly truncates data because 
-        // of the appended forecast row).
-        setFilteredData([...data]);
-    };
-
-    const fetchTrendingData = async () => {
-        setLoading(true);
-        try {
-            const limitMonths = range === "3M" ? 3 : range === "6M" ? 6 : range === "12M" ? 12 : 0;
-            const res = await api.get("/dashboard/trending-issues", {
-                params: { limit_months: limitMonths, metric: activeMetric }
-            });
-            const rawData = res.data;
-            if (rawData.length > 0) {
-                // Ignore metadata keys when registering the main interactive keys
-                const firstRowKeys = Object.keys(rawData[0]).filter(k =>
-                    k !== "month" &&
-                    !k.endsWith("_upper_bound") &&
-                    !k.endsWith("_mom") &&
-                    !k.endsWith("_correlated_with") &&
-                    k !== "is_forecast"
-                );
-                setKeys(firstRowKeys);
-                setAllData(rawData);
-                sliceData(range, rawData);
-            } else {
-                setAllData([]);
-                setKeys([]);
-                setFilteredData([]);
-            }
-        } catch (err) {
-            console.error("Error fetching trending data:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const [activeMetric, setActiveMetric] = useState("severity");
 
     useEffect(() => {
+        let ignore = false;
+
+        const fetchTrendingData = async () => {
+            try {
+                const limitMonths = range === "3M" ? 3 : range === "6M" ? 6 : range === "12M" ? 12 : 0;
+                const res = await api.get("/dashboard/trending-issues", {
+                    params: { limit_months: limitMonths, metric: activeMetric }
+                });
+
+                if (ignore) return;
+
+                const rawRows = Array.isArray(res.data) ? res.data.filter((row) => !row.is_forecast) : [];
+                if (!rawRows.length) {
+                    setChartRows([]);
+                    setVisibleTopics([]);
+                    return;
+                }
+
+                const allKeys = Object.keys(rawRows[0]).filter((key) =>
+                    key !== "month" &&
+                    !key.endsWith("_upper_bound") &&
+                    !key.endsWith("_mom") &&
+                    !key.endsWith("_correlated_with") &&
+                    key !== "is_forecast"
+                );
+
+                const topTopics = buildVisibleTopics(rawRows, allKeys);
+                const topTopicKeys = topTopics.map((topic) => topic.key);
+
+                setVisibleTopics(topTopics);
+                setChartRows(
+                    rawRows.map((row) => {
+                        const nextRow = { month: row.month };
+                        topTopicKeys.forEach((key) => {
+                            nextRow[key] = Number(row[key] || 0);
+                        });
+                        return nextRow;
+                    })
+                );
+            } catch (err) {
+                console.error("Error fetching trending data:", err);
+                if (!ignore) {
+                    setChartRows([]);
+                    setVisibleTopics([]);
+                }
+            } finally {
+                if (!ignore) {
+                    setLoading(false);
+                }
+            }
+        };
+
         fetchTrendingData();
+
+        return () => {
+            ignore = true;
+        };
     }, [range, activeMetric]);
 
-    if (loading) return <SkeletonChart height={360} />
+    if (loading) return <SkeletonChart height={360} />;
 
-    if (allData.length === 0) {
+    if (!chartRows.length || !visibleTopics.length) {
         return (
             <div style={{ height: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <p style={{ color: "#64748B", fontWeight: 500 }}>No trending data available. Run analysis first.</p>
+                <p style={{ color: "#72788c", fontWeight: 500 }}>No trend data available for this window.</p>
             </div>
         );
     }
 
-    // Clean Light Theme Custom Tooltip
     const CustomTooltip = ({ active, payload, label }) => {
-        if (active && payload && payload.length) {
-            const isForecast = payload[0]?.payload?.is_forecast || false;
-            const headerStyle = { margin: '0 0 10px 0', fontWeight: 700, borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', fontSize: '14px' };
+        if (!active || !payload || !payload.length) return null;
 
-            return (
-                <div style={{
-                    background: '#FFFFFF',
-                    border: '1px solid #E2E8F0',
-                    padding: '16px',
-                    borderRadius: '12px',
-                    color: '#0F172A',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04)'
-                }}>
-                    {isForecast ? (
-                        <p style={{ ...headerStyle, color: '#F59E0B' }}>{label} ⚡ Future Estimate</p>
-                    ) : (
-                        <p style={headerStyle}>{label}</p>
-                    )}
-
-                    {payload
-                        .filter(entry =>
-                            entry &&
-                            entry.payload &&
-                            entry.value !== undefined &&
-                            entry.value !== null &&
-                            // THIS IS THE FIX: Hides the faint background bands from the tooltip
-                            !String(entry.name).endsWith("_upper_bound")
-                        )
-                        .slice()
-                        .sort((a, b) => (b.value || 0) - (a.value || 0))
-                        .map((entry, index) => {
-                            const upperBoundKey = `${entry.name}_upper_bound`;
-                            const upperBoundVal = entry.payload[upperBoundKey] || 0;
-                                            const isAnomaly = (entry.value || 0) > upperBoundVal && upperBoundVal > 0 && !isForecast;
-
-                            const momKey = `${entry.name}_mom`;
-                            const momVal = entry.payload[momKey] || 0;
-                            let momStr = "";
-                            let momColor = "#64748B";
-
-                            if (momVal > 0) {
-                                momStr = `(Trending Up)`;
-                                momColor = "#EF4444"; // Rose Red
-                            } else if (momVal < 0) {
-                                momStr = `(Trending Down)`;
-                                momColor = "#10B981"; // Emerald Green
-                            }
-
-                            const corrKey = `${entry.name}_correlated_with`;
-                            const corrVal = entry.payload[corrKey];
-
-                            return (
-                                <div key={`item-${index}`} style={{ margin: '10px 0' }}>
-                                    <p style={{ margin: '0 0 3px 0', fontSize: '13px', color: entry.color, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        {isAnomaly && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444' }} />}
-                                        <span style={{ fontWeight: 600 }}>{entry.name}:</span>
-                                        <span style={{ color: '#0F172A', fontWeight: '800' }}>{Math.round(entry.value || 0)}</span>
-                                        <span style={{ color: momColor, fontSize: '12px', marginLeft: '4px', fontWeight: 700 }}>{momStr}</span>
-                                    </p>
-                                    {corrVal && (
-                                        <p style={{ margin: '0 0 0 14px', fontSize: '11px', color: '#64748B' }}>
-                                            🔗 Also mentioned with: <span style={{ color: '#334155', fontWeight: 600 }}>{corrVal}</span>
-                                        </p>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    <p style={{ margin: '15px 0 0', fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>
-                        {activeMetric === "revenue" ? "Business Impact (Estimated $ Risk)" : "Priority Level (Higher = More Urgent)"}
-                    </p>
+        return (
+            <div
+                style={{
+                    background: "#FFFFFF",
+                    border: "1px solid rgba(91, 100, 121, 0.12)",
+                    padding: "14px",
+                    borderRadius: "16px",
+                    color: "#262c3f",
+                    boxShadow: "0 10px 18px rgba(49, 57, 77, 0.08)"
+                }}
+            >
+                <div style={{ margin: "0 0 10px 0", fontWeight: 700, borderBottom: "1px solid rgba(91, 100, 121, 0.12)", paddingBottom: "8px", fontSize: "13px" }}>
+                    {label}
                 </div>
-            );
-        }
-        return null;
+
+                {payload
+                    .slice()
+                    .sort((a, b) => (b.value || 0) - (a.value || 0))
+                    .map((entry) => {
+                        const topic = visibleTopics.find((item) => item.key === entry.name);
+                        const trend = topic?.trend || { label: "Stable", tone: "neutral" };
+                        const tone = toneStyles(trend.tone);
+
+                        return (
+                            <div key={entry.name} style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "10px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: entry.color, fontSize: "12px", fontWeight: 700 }}>
+                                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: entry.color, display: "inline-block" }} />
+                                    <span>{entry.name}</span>
+                                </div>
+                                <div style={{ color: "#262c3f", fontSize: "15px", fontWeight: 800 }}>
+                                    {formatMetricValue(entry.value, activeMetric)}
+                                </div>
+                                <div style={{ display: "inline-flex", width: "fit-content", padding: "4px 8px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, color: tone.color, background: tone.background }}>
+                                    {trend.label}
+                                </div>
+                            </div>
+                        );
+                    })}
+            </div>
+        );
     };
 
     return (
-        <div style={{ width: '100% ' }}>
-            {/* View Toggles & Badges - Clean Light Theme */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    {/* CONFUSING BADGES REMOVED */}
+        <div className="trending-panel">
+            <div className="trending-panel__topbar">
+                <div>
+                    <div className="trending-panel__hint">Focus on the top 3 topics changing most in the current view.</div>
+                    <div className="trending-panel__helper">
+                        {activeMetric === "revenue"
+                            ? "Business Impact shows estimated cost pressure over time."
+                            : "Priority shows which issues are becoming more urgent over time."}
+                    </div>
                 </div>
 
-                {/* Dynamic UI Toggles */}
-                <div style={{ display: 'flex', gap: '16px', background: '#F1F5F9', padding: '6px 14px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ display: "flex", gap: "4px" }}>
-                        <button
-                            title="Rank issues by how urgent they are to fix"
-                            onClick={() => setActiveMetric("severity")}
-                            style={{
-                                padding: "6px 12px", borderRadius: "8px", border: "none", fontSize: "11px", fontWeight: 700,
-                                background: activeMetric === "severity" ? "#FFFFFF" : "transparent",
-                                color: activeMetric === "severity" ? "#3B82F6" : "#64748B", cursor: "pointer", transition: "all 0.2s",
-                                boxShadow: activeMetric === "severity" ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
-                            }}
-                        >PRIORITY</button>
-                        <button
-                            title="Rank issues by estimated cost to the business"
-                            onClick={() => setActiveMetric("revenue")}
-                            style={{
-                                padding: "6px 12px", borderRadius: "8px", border: "none", fontSize: "11px", fontWeight: 700,
-                                background: activeMetric === "revenue" ? "#FFFFFF" : "transparent",
-                                color: activeMetric === "revenue" ? "#3B82F6" : "#64748B", cursor: "pointer", transition: "all 0.2s",
-                                boxShadow: activeMetric === "revenue" ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
-                            }}
-                        >BUSINESS IMPACT</button>
-                    </div>
-
-
+                <div className="trending-toggle" role="tablist" aria-label="Trending metric mode">
+                    <button
+                        className={`trending-toggle__button ${activeMetric === "severity" ? "is-active" : ""}`.trim()}
+                        onClick={() => setActiveMetric("severity")}
+                    >
+                        Priority
+                    </button>
+                    <button
+                        className={`trending-toggle__button ${activeMetric === "revenue" ? "is-active" : ""}`.trim()}
+                        onClick={() => setActiveMetric("revenue")}
+                    >
+                        Business Impact
+                    </button>
                 </div>
             </div>
 
-            <ResponsiveContainer width="100%" height={350}>
-                <AreaChart
-                    data={showForecast ? filteredData : filteredData.filter(d => !d.is_forecast)}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                >
-                    <defs>
-                        {keys.map((key, index) => (
-                            <linearGradient key={`colorUv-${index}`} id={`colorUv-${index}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.3} />
-                                <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.01} />
-                            </linearGradient>
+            <div className="trending-summary">
+                {visibleTopics.map((topic, index) => {
+                    const tone = toneStyles(topic.trend.tone);
+                    return (
+                        <div key={topic.key} className="trending-summary__card">
+                            <div className="trending-summary__row">
+                                <span className="trending-summary__dot" style={{ background: COLORS[index % COLORS.length] }} />
+                                <span className="trending-summary__name">{topic.key}</span>
+                            </div>
+                            <strong>{formatMetricValue(topic.currentValue, activeMetric)}</strong>
+                            <span className="trending-summary__subtle">
+                                Previous {formatMetricValue(topic.prevValue, activeMetric)}
+                            </span>
+                            <span className="trending-summary__status" style={{ color: tone.color, background: tone.background }}>
+                                {topic.trend.label}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="trending-chart-wrap">
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartRows} margin={{ top: 8, right: 12, left: -18, bottom: 16 }}>
+                        <defs>
+                            {visibleTopics.map((topic, index) => (
+                                <linearGradient key={topic.key} id={`trend-fill-${index}`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.26} />
+                                    <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity={0.03} />
+                                </linearGradient>
+                            ))}
+                        </defs>
+
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(91, 100, 121, 0.12)" vertical={false} />
+                        <XAxis
+                            dataKey="month"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#72788c", fontSize: 12, fontWeight: 600 }}
+                            dy={6}
+                            height={34}
+                        />
+                        <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#9aa0af", fontSize: 11, fontWeight: 600 }}
+                            tickFormatter={(value) => (value === 0 ? "" : Math.round(value))}
+                        />
+                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(91, 100, 121, 0.22)", strokeDasharray: "4 4" }} />
+
+                        {visibleTopics.map((topic, index) => (
+                            <Area
+                                key={topic.key}
+                                type="monotone"
+                                dataKey={topic.key}
+                                stroke={COLORS[index % COLORS.length]}
+                                strokeWidth={2.5}
+                                fill={`url(#trend-fill-${index})`}
+                                fillOpacity={1}
+                                activeDot={{ r: 5, fill: "#ffffff", stroke: COLORS[index % COLORS.length], strokeWidth: 2 }}
+                            />
                         ))}
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                    <XAxis
-                        dataKey="month"
-                        stroke="#94A3B8"
-                        tick={{ fill: '#64748B', fontSize: 12, fontWeight: 500 }}
-                        tickMargin={12}
-                        axisLine={false}
-                        tickLine={false}
-                    />
-                    <YAxis
-                        stroke="#94A3B8"
-                        tick={{ fill: '#64748B', fontSize: 12, fontWeight: 500 }}
-                        tickFormatter={(val) => val === 0 ? '' : val}
-                        domain={[0, 'auto']}
-                        axisLine={false}
-                        tickLine={false}
-                    />
-                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#CBD5E1', strokeWidth: 1, strokeDasharray: '5 5' }} />
-                    <Legend
-                        wrapperStyle={{ paddingTop: "20px", color: "#475569", fontWeight: 600, fontSize: "13px" }}
-                        iconType="circle"
-                    />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
 
-                    {/* Clean Light Theme Scrubber */}
-                    <Brush
-                        dataKey="month"
-                        height={24}
-                        stroke="#CBD5E1"
-                        fill="#F8FAFC"
-                        tickFormatter={() => ""}
-                        travellerWidth={8}
-                        style={{ border: '1px solid #E2E8F0' }}
-                    />
-
-                    {/* Underlying Statistical Variance Bands (Soft Gray) */}
-                    {showBands && keys.map((key, index) => (
-                        <Area
-                            key={`${key}_bound`}
-                            type="monotone"
-                            dataKey={`${key}_upper_bound`}
-                            stroke="none"
-                            fill="rgba(0, 0, 0, 0.04)"
-                            isAnimationActive={false}
-                            activeDot={false}
-                            legendType="none"
-                        />
-                    ))}
-
-                    {/* Main Signal Lines */}
-                    {keys.map((key, index) => (
-                        <Area
-                            key={key}
-                            type="monotone"
-                            dataKey={key}
-                            stroke={COLORS[index % COLORS.length]}
-                            strokeWidth={2}
-                            fillOpacity={1}
-                            fill={`url(#colorUv-${index})`}
-                            animationDuration={500}
-                            dot={(props) => {
-                                const { cx, cy, payload, dataKey } = props;
-                                if (!payload) return null;
-
-                                const upperBoundKey = `${dataKey}_upper_bound`;
-                                const upperBoundVal = payload[upperBoundKey];
-
-                                // Flat red dot for anomalies
-                                if (showBands && payload[dataKey] > upperBoundVal && upperBoundVal > 0) {
-                                    return (
-                                        <circle
-                                            key={`dot-${cx}-${cy}`}
-                                            cx={cx} cy={cy} r={5}
-                                            fill="#EF4444"
-                                            stroke="#FFFFFF" strokeWidth={1.5}
-                                        />
-                                    );
-                                }
-                                return null;
-                            }}
-                        />
-                    ))}
-                </AreaChart>
-            </ResponsiveContainer>
         </div>
     );
 }

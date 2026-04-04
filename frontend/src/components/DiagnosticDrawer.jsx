@@ -1,108 +1,132 @@
-import { useState, useEffect } from "react"
-import api from "../services/api"
-import { highlightEntities } from "../utils/highlight_utils.jsx"
+import React, { useState, useEffect } from "react";
+import api from "../services/api";
+import { highlightEntities } from "../utils/highlight_utils.jsx";
 
-export default function DiagnosticDrawer({ isOpen, onClose, aspect, month, topic }) {
-  const [evidence, setEvidence] = useState([])
-  const [loading, setLoading] = useState(false)
+function ReviewSurface({ review, keywordsString }) {
+    const isEnterprise = review.user_tier === "Enterprise" || (review.value_weight && review.value_weight >= 4);
+    const isPremium = review.user_tier === "Premium" || (review.value_weight && review.value_weight >= 2);
 
-  useEffect(() => {
-    if (isOpen) fetchEvidence()
-  }, [isOpen, aspect, month, topic])
+    return (
+        <div
+            className="evidence-modal__review"
+            style={{
+                border: `1px solid ${review.score <= 2 ? "rgba(234, 90, 106, 0.18)" : "rgba(148, 163, 184, 0.14)"}`,
+            }}
+        >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 14 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    {isEnterprise && <span className="tag tag--warm">Enterprise</span>}
+                    {isPremium && !isEnterprise && <span className="tag">Premium</span>}
+                    <span style={{ color: "#e2a63c", fontSize: 12, fontWeight: 700 }}>
+                        {"★".repeat(parseInt(review.score) || 0)}
+                        {"☆".repeat(5 - (parseInt(review.score) || 0))}
+                    </span>
+                    {review.upvotes > 0 && <span className="muted-note">👍 {review.upvotes}</span>}
+                </div>
 
-  const fetchEvidence = async () => {
-    try {
-      setLoading(true)
-      const res = await api.get("/dashboard/diagnostic-evidence", {
-        params: { aspect, month, topic },
-      })
-      setEvidence(res.data || [])
-    } catch (error) {
-      console.error("Evidence fetch error:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (!isOpen) return null
-
-  return (
-    <>
-      <div className="drawer-overlay" onClick={onClose} />
-      <aside className="drawer-panel panel" aria-label="Diagnostic evidence drawer">
-        <div className="page-grid" style={{ height: "100%" }}>
-          <div className="panel__header">
-            <div>
-              <div className="panel__eyebrow">Diagnostic evidence</div>
-              <h2 className="panel__title panel__title--section">Customer comments</h2>
-              <p className="panel__text">
-                {month ? `Period: ${month}` : "Current selection"}
-                {topic ? ` · Focus: ${topic}` : ""}
-                {aspect ? ` · Aspect: ${aspect}` : ""}
-              </p>
-            </div>
-            <button className="app-icon-button" onClick={onClose} type="button" aria-label="Close drawer">
-              ×
-            </button>
-          </div>
-
-          <div style={{ overflowY: "auto", minHeight: 0 }} className="review-grid">
-            {loading ? (
-              <div className="auth-note">Loading reviews...</div>
-            ) : evidence.length > 0 ? (
-              evidence.map((review, index) => {
-                const isEnterprise = review.user_tier === "Enterprise" || (review.value_weight && review.value_weight >= 4)
-                const isPremium = review.user_tier === "Premium" || (review.value_weight && review.value_weight >= 2)
-
-                return (
-                  <article className="review-card" key={index}>
-                    <div className="review-card__meta">
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                        {isEnterprise ? <span className="status-badge is-critical">Enterprise</span> : null}
-                        {!isEnterprise && isPremium ? <span className="status-badge is-warning">Premium</span> : null}
-                        <span className="status-badge">{"★".repeat(parseInt(review.score, 10) || 0)}{"☆".repeat(5 - (parseInt(review.score, 10) || 0))}</span>
-                        {review.upvotes > 0 ? <span className="status-badge">{review.upvotes} upvotes</span> : null}
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div className="muted" style={{ fontSize: "0.82rem", fontWeight: 700 }}>
-                          {review.at ? review.at.split("T")[0] : "Recent"}
-                        </div>
-                        {review.app_version && review.app_version !== "N/A" && review.app_version !== "Build N/A" ? (
-                          <div className="faint" style={{ fontSize: "0.76rem", fontWeight: 700 }}>
+                <div style={{ textAlign: "right" }}>
+                    <div className="muted-note">{review.at ? String(review.at).split("T")[0] : "Recent"}</div>
+                    {review.app_version && review.app_version !== "N/A" && review.app_version !== "Build N/A" && (
+                        <div className="muted-note" style={{ fontSize: 11 }}>
                             Ver {review.app_version.replace("Build ", "")}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
+                        </div>
+                    )}
+                </div>
+            </div>
 
-                    <p
-                      className="review-card__quote"
-                      style={{ fontStyle: parseInt(review.score, 10) <= 2 ? "italic" : "normal" }}
-                    >
-                      "
-                      {highlightEntities(
-                        review.text || "",
-                        "slow, crash, bug, error, login, payment, expensive, price, quality, feature",
-                      )}
-                      "
-                    </p>
+            <div style={{ color: "#425069", lineHeight: 1.8, fontSize: 15, fontStyle: review.score <= 2 ? "italic" : "normal" }}>
+                "{highlightEntities(review.text || "", keywordsString || "slow, crash, bug, error, login, payment, expensive, price, quality, feature")}"
+            </div>
 
-                    {review.value_weight > 1 ? (
-                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                        <span className="status-badge is-critical">
-                          {review.value_weight.toFixed(1)}x business importance
-                        </span>
-                      </div>
-                    ) : null}
-                  </article>
-                )
-              })
-            ) : (
-              <div className="auth-note">No specific evidence found for this cross-section.</div>
+            {review.value_weight > 1 && (
+                <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+                    <span className="tag tag--warm">{review.value_weight.toFixed(1)}x Business Importance</span>
+                </div>
             )}
-          </div>
         </div>
-      </aside>
-    </>
-  )
+    );
 }
+
+const DiagnosticDrawer = ({ isOpen, onClose, aspect, month, topic, items, title, subtitle, keywordsString }) => {
+    const [evidence, setEvidence] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        if (items && items.length) {
+            setEvidence(items);
+            setLoading(false);
+            return;
+        }
+
+        let ignore = false;
+
+        const fetchEvidence = async () => {
+            try {
+                setLoading(true);
+                const res = await api.get("/dashboard/diagnostic-evidence", {
+                    params: { aspect, month, topic }
+                });
+                if (!ignore) {
+                    setEvidence(res.data || []);
+                }
+            } catch (err) {
+                console.error("Evidence fetch error:", err);
+                if (!ignore) {
+                    setEvidence([]);
+                }
+            } finally {
+                if (!ignore) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        fetchEvidence();
+
+        return () => {
+            ignore = true;
+        };
+    }, [isOpen, aspect, month, topic, items]);
+
+    if (!isOpen) return null;
+
+    const resolvedTitle = title || "Customer Comments";
+    const resolvedSubtitle = subtitle || [month && `Period ${month}`, topic && `Focus ${topic}`, aspect && `Aspect ${aspect}`].filter(Boolean).join(" • ");
+
+    return (
+        <div className="evidence-modal__backdrop" onClick={onClose}>
+            <div className="evidence-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="evidence-modal__header">
+                    <div>
+                        <span className="eyebrow">Evidence</span>
+                        <h2>{resolvedTitle}</h2>
+                        {resolvedSubtitle ? <p className="muted-note" style={{ marginTop: 8 }}>{resolvedSubtitle}</p> : null}
+                    </div>
+                    <button onClick={onClose} className="btn-secondary evidence-modal__close">
+                        Close
+                    </button>
+                </div>
+
+                <div className="evidence-modal__body">
+                    {loading ? (
+                        <div className="glass-card" style={{ textAlign: "center", padding: 32, background: "#ffffff" }}>
+                            <div style={{ fontSize: 24, marginBottom: 12 }}>⏳</div>
+                            <div className="muted-note">Loading evidence...</div>
+                        </div>
+                    ) : evidence.length > 0 ? (
+                        evidence.map((rev, index) => (
+                            <ReviewSurface key={`${rev.at || "row"}-${index}`} review={rev} keywordsString={keywordsString} />
+                        ))
+                    ) : (
+                        <div className="glass-card" style={{ textAlign: "center", padding: 32, background: "#ffffff" }}>
+                            <div className="muted-note">No specific evidence found for this cross-section.</div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default DiagnosticDrawer;

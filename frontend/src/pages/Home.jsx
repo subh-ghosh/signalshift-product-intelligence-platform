@@ -1,86 +1,100 @@
 import { useNavigate } from "react-router-dom"
+import AppShell from "../components/AppShell"
 
-const previewHeights = ["42%", "66%", "88%", "70%", "84%", "62%", "44%"]
+const previewCards = [
+  { label: "Live Signals", value: "13", note: "active priorities" },
+  { label: "Customer Mood", value: "44.7%", note: "positive sentiment" },
+  { label: "Exec Exports", value: "PDF + CSV", note: "ready for leadership" },
+]
+
+const highlights = [
+  { title: "Executive summaries", copy: "AI-generated briefings that translate noisy review streams into an actionable narrative." },
+  { title: "Critical issue tracking", copy: "Trend lines, anomaly alerts, and drill-down evidence across product areas." },
+  { title: "Operational controls", copy: "Keep upload, sync, export, and analysis workflows accessible from the same workspace." },
+]
 
 export default function Home() {
   const navigate = useNavigate()
 
   return (
-    <div className="home-shell">
-      <section className="hero-surface">
-        <div className="home-layout">
-          <div className="page-grid">
-            <div className="panel panel--muted">
-              <div className="panel__eyebrow">Customer Intelligence Platform</div>
-              <h1 className="hero-lead">Turn feedback noise into product direction.</h1>
-              <p className="hero-copy">
-                SignalShift surfaces sentiment shifts, emerging complaints, and executive-ready
-                narratives in one premium workspace. The experience is now built to feel like a
-                modern analytics product from first click to final report.
-              </p>
-              <div className="cta-row">
-                <button className="btn-primary" onClick={() => navigate("/login")}>
-                  Open Workspace
-                </button>
-                <button className="btn-secondary" onClick={() => navigate("/dashboard")}>
-                  Jump to Dashboard
-                </button>
-              </div>
+    <AppShell activePath="/" title="SignalShift" subtitle="Workspace Overview" searchPlaceholder="Search reports, teams, or issues...">
+      <section className="route-frame hero-grid">
+        <div className="hero-card">
+          <div className="hero-card__content">
+            <div className="eyebrow">Customer Intelligence Platform</div>
+            <h1 className="hero-title">A calmer control room for customer signals.</h1>
+            <p className="hero-copy">
+              SignalShift turns app review data into an executive-ready workspace with softer navigation, cleaner cards, and faster paths from detection to action.
+            </p>
+
+            <div className="button-row" style={{ marginTop: 24 }}>
+              <button className="btn-primary" onClick={() => navigate("/login")}>
+                Enter Workspace
+              </button>
+              <button className="btn-secondary" onClick={() => navigate("/dashboard")}>
+                View Dashboard Preview
+              </button>
             </div>
 
-            <div className="surface-grid surface-grid--2">
-              <div className="panel panel--tight">
-                <div className="status-badge is-positive">Live sentiment tracking</div>
-                <p className="panel__text" style={{ marginTop: 14 }}>
-                  Continuous analysis, rapid alerting, and clean executive summaries for product
-                  and CX teams.
-                </p>
+            <div className="hero-metrics">
+              {previewCards.map((card) => (
+                <div key={card.label} className="hero-mini-card">
+                  <span>{card.label}</span>
+                  <strong>{card.value}</strong>
+                  <span>{card.note}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="utility-stack">
+          <div className="utility-card">
+            <div className="utility-card__title">
+              <div>
+                <h3>Workspace Preview</h3>
+                <div className="section-kicker">Reference-inspired layout adapted for analytics operations.</div>
               </div>
-              <div className="panel panel--tight">
-                <div className="status-badge is-warning">Retention intelligence</div>
-                <p className="panel__text" style={{ marginTop: 14 }}>
-                  Spot the issues customers feel first, then export structured evidence and
-                  explainable reporting.
-                </p>
-              </div>
+              <span className="tag tag--warm">New Visual System</span>
+            </div>
+
+            <div className="info-list">
+              {highlights.map((item) => (
+                <div key={item.title} className="info-list__item">
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span>{item.copy}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="panel dashboard-preview">
-            <div className="panel__header">
+          <div className="utility-card">
+            <div className="utility-card__title">
               <div>
-                <div className="panel__eyebrow">Preview</div>
-                <h2 className="panel__title panel__title--section">Income-style insight canvas</h2>
-                <p className="panel__text">
-                  A softer dashboard shell, elevated cards, and a clearer story around momentum,
-                  critical signals, and review evidence.
-                </p>
+                <h3>Why This Refresh</h3>
+                <div className="section-kicker">What the redesign changes across the product.</div>
               </div>
-              <div className="status-badge">Workspace v3</div>
+              <span className="tag">SignalShift</span>
             </div>
-
-            <div className="feature-card feature-card--highlight">
-              <div className="surface-grid surface-grid--2" style={{ alignItems: "end" }}>
+            <div className="info-list">
+              <div className="info-list__item">
                 <div>
-                  <div className="panel__eyebrow">Momentum</div>
-                  <div className="panel__title panel__title--section">+24%</div>
-                  <p className="panel__text">Positive sentiment is tracking above the trailing quarter.</p>
-                </div>
-                <div className="feature-card__cta">
-                  <span className="muted">Weekly product pulse</span>
-                  <strong className="mono">$2.6k</strong>
+                  <strong>Unified surfaces</strong>
+                  <span>Home, login, and dashboard now share the same editorial shell and control language.</span>
                 </div>
               </div>
-
-              <div className="preview-bars">
-                {previewHeights.map((height, index) => (
-                  <span key={index} style={{ height }} />
-                ))}
+              <div className="info-list__item">
+                <div>
+                  <strong>Cleaner analytics</strong>
+                  <span>Charts, alerts, summaries, and exports are grouped into calmer, easier-to-scan layouts.</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
-    </div>
+    </AppShell>
   )
 }

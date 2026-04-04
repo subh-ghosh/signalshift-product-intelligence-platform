@@ -14,6 +14,12 @@ import {
 import api from "../services/api";
 import { SkeletonChart } from "./Skeleton";
 
+function getStabilityMeta(score) {
+    if (score > 90) return { label: "Excellent", color: "#31b57e", background: "rgba(49, 181, 126, 0.12)" };
+    if (score > 70) return { label: "Consistent", color: "#4b78b4", background: "rgba(75, 120, 180, 0.12)" };
+    return { label: "Fluctuating", color: "#ea5b57", background: "rgba(234, 91, 87, 0.12)" };
+}
+
 const SentimentStabilityChart = ({ limitMonths = 0, onStabilityClick }) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -36,170 +42,129 @@ const SentimentStabilityChart = ({ limitMonths = 0, onStabilityClick }) => {
     }, [limitMonths]);
 
     if (loading) return <SkeletonChart height={250} />;
-    if (!data.length) return <p style={{ color: "#64748B", fontSize: "14px", padding: "20px 0" }}>No stability data available.</p>;
+    if (!data.length) return <p style={{ color: "#72788c", fontSize: "14px", padding: "20px 0" }}>No stability data available.</p>;
 
-    const volatileCount = data.filter(d => d.is_volatile).length;
-    const stabilityScore = Math.max(0, 100 - (volatileCount * 20));
-
-    // Clean Light Theme Health Status
-    const healthStatus = stabilityScore > 90 ? "EXCELLENT" : stabilityScore > 70 ? "CONSISTENT" : "FLUCTUATING";
-    const healthColor = stabilityScore > 90 ? "#10B981" : stabilityScore > 70 ? "#3B82F6" : "#EF4444"; // Emerald, Blue, Rose
-    const healthBg = stabilityScore > 90 ? "#ECFDF5" : stabilityScore > 70 ? "#EFF6FF" : "#FEF2F2";
+    const volatileMonths = data.filter((item) => item.is_volatile);
+    const hasVolatileMonths = volatileMonths.length > 0;
+    const stabilityScore = Math.max(0, 100 - (volatileMonths.length * 20));
+    const stability = getStabilityMeta(stabilityScore);
+    const latestMonth = data[data.length - 1];
 
     return (
-        <div style={{ width: "100%", height: 340, position: "relative", marginTop: "10px" }}>
-            {/* Responsive Header: Stability Index + Status + Legend */}
-            <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "16px",
-                marginBottom: "20px",
-                padding: "0 10px"
-            }}>
-                {/* Consistency Health Index */}
-                <div title="Measure of how consistent customer satisfaction is over time" style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px"
-                }}>
-                    <div style={{
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        color: healthColor,
-                        padding: "4px 10px",
-                        borderRadius: "8px",
-                        background: healthBg,
-                        border: `1px solid ${healthColor}33`,
-                        letterSpacing: "0.5px",
-                        whiteSpace: "nowrap"
-                    }}>
-                        {stabilityScore}% HAPPINESS STABILITY
-                    </div>
-                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                        Status: <span style={{ color: "#0F172A", marginLeft: "4px" }}>{healthStatus}</span>
+        <div className="stability-card">
+            <div className="stability-card__topline">
+                <div>
+                    <div className="stability-card__eyebrow">Stability summary</div>
+                    <div className="stability-card__headline">{stabilityScore}% happiness stability</div>
+                    <div className="stability-card__copy">
+                        Latest month: {latestMonth.month} at a sentiment score of {latestMonth.score}.
                     </div>
                 </div>
-
-                {/* Legend */}
-                <div style={{
-                    display: "flex",
-                    gap: "16px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    color: "#64748B",
-                    textTransform: "uppercase"
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <div style={{ width: "10px", height: "10px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "2px" }}></div>
-                        Normal Range
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <div style={{ width: "10px", height: "10px", background: "#EF4444", borderRadius: "50%" }}></div>
-                        Notable Change
-                    </div>
-                </div>
+                <span className="stability-card__status" style={{ color: stability.color, background: stability.background }}>
+                    {stability.label}
+                </span>
             </div>
 
-            <div style={{ width: "100%", height: 280 }}>
+            <div className="stability-card__helper">
+                Red markers indicate unusual months outside the normal range. Use the highlighted month chips below to open evidence.
+            </div>
 
-            <ResponsiveContainer>
-                <ComposedChart data={data} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
-                    <defs>
-                        {/* Clean Light Blue Gradient */}
-                        <linearGradient id="stabilityGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.15} />
-                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.0} />
-                        </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                    <XAxis
-                        dataKey="month"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: "#64748B", fontSize: 11, fontWeight: 500 }}
-                        dy={10}
-                    />
-                    <YAxis
-                        domain={['dataMin - 0.2', 'dataMax + 0.2']}
-                        hide
-                    />
-                    <Tooltip
-                        content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                                const d = payload[0].payload;
-                                return (
-                                    <div style={{
-                                        background: "#FFFFFF",
-                                        border: "1px solid #E2E8F0",
-                                        padding: "16px",
-                                        borderRadius: "12px",
-                                        fontSize: "13px",
-                                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04)"
-                                    }}>
-                                        <div style={{ fontWeight: 700, color: "#0F172A", marginBottom: "8px", borderBottom: "1px solid #E2E8F0", paddingBottom: "6px" }}>
-                                            {d.month}
-                                        </div>
-                                        <div style={{ color: "#64748B", marginBottom: "4px" }}>
-                                            Happiness Level: <strong style={{ color: "#0F172A", fontSize: "14px" }}>{d.score}</strong>
-                                        </div>
-                                        {d.is_volatile && (
-                                            <div style={{
-                                                marginTop: "12px",
-                                                fontSize: "11px",
-                                                fontWeight: 800,
-                                                color: "#DC2626",
-                                                background: "#FEF2F2",
-                                                border: "1px solid #FECACA",
-                                                padding: "4px 8px",
-                                                borderRadius: "6px",
-                                                textAlign: "center",
-                                                letterSpacing: "0.5px"
-                                            }}>
-                                                ⚠️ NOTABLE SHIFT
+            {hasVolatileMonths ? (
+                <div className="stability-card__months">
+                    {volatileMonths.map((item) => (
+                        <button
+                            key={item.month}
+                            type="button"
+                            className="stability-month"
+                            onClick={() => onStabilityClick && onStabilityClick(item.month)}
+                        >
+                            <span>{item.month}</span>
+                            <strong>Open notable shift</strong>
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <div className="stability-card__steady">No unusual months detected in the current window.</div>
+            )}
+
+            <div className="stability-card__chart">
+                <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={data} margin={{ top: 14, right: 16, left: -18, bottom: 16 }}>
+                        <defs>
+                            <linearGradient id="stabilityGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#4b78b4" stopOpacity={0.14} />
+                                <stop offset="95%" stopColor="#4b78b4" stopOpacity={0.01} />
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(91, 100, 121, 0.12)" vertical={false} />
+                        <XAxis
+                            dataKey="month"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#72788c", fontSize: 11, fontWeight: 600 }}
+                            dy={6}
+                            height={34}
+                        />
+                        <YAxis
+                            hide
+                            domain={["dataMin - 0.2", "dataMax + 0.2"]}
+                        />
+                        <Tooltip
+                            content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                    const row = payload[0].payload;
+                                    return (
+                                        <div
+                                            style={{
+                                                background: "#FFFFFF",
+                                                border: "1px solid rgba(91, 100, 121, 0.12)",
+                                                padding: "14px",
+                                                borderRadius: "16px",
+                                                fontSize: "12px",
+                                                boxShadow: "0 10px 18px rgba(49, 57, 77, 0.08)"
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: 700, color: "#262c3f", marginBottom: "8px", borderBottom: "1px solid rgba(91, 100, 121, 0.12)", paddingBottom: "6px" }}>
+                                                {row.month}
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            }
-                            return null;
-                        }}
-                    />
-                    {/* Shaded Stability Band (Area) */}
-                    <Area
-                        type="monotone"
-                        dataKey="upper_band"
-                        stroke="none"
-                        fill="url(#stabilityGradient)"
-                        baseLine={({ payload }) => payload.lower_band}
-                    />
-                    {/* The Sentiment Line - Primary Blue */}
-                    <Line
-                        type="monotone"
-                        dataKey="score"
-                        stroke="#3B82F6"
-                        strokeWidth={3}
-                        dot={{ r: 4, fill: "#3B82F6", strokeWidth: 0 }}
-                        activeDot={{ r: 6, fill: "#FFFFFF", stroke: "#3B82F6", strokeWidth: 2 }}
-                        animationDuration={1500}
-                        onClick={(data) => onStabilityClick && onStabilityClick(data.month)}
-                        style={{ cursor: onStabilityClick ? 'pointer' : 'default' }}
-                    />
-                    {/* Scatter for Volatility Points - Rose Red */}
-                    <Scatter
-                        data={data.filter(d => d.is_volatile)}
-                        fill="#EF4444"
-                        stroke="#FFFFFF"
-                        strokeWidth={2}
-                        r={6}
-                        onClick={(data) => onStabilityClick && onStabilityClick(data.month)}
-                        style={{ cursor: onStabilityClick ? 'pointer' : 'default' }}
-                    />
-                </ComposedChart>
-            </ResponsiveContainer>
+                                            <div style={{ color: "#72788c", marginBottom: "4px" }}>
+                                                Happiness level: <strong style={{ color: "#262c3f", fontSize: "14px" }}>{row.score}</strong>
+                                            </div>
+                                            <div style={{ display: "inline-flex", marginTop: "8px", padding: "4px 8px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, color: row.is_volatile ? "#ea5b57" : "#4b78b4", background: row.is_volatile ? "rgba(234, 91, 87, 0.12)" : "rgba(75, 120, 180, 0.12)" }}>
+                                                {row.is_volatile ? "Notable shift" : "Within normal range"}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            }}
+                        />
+                        <Area
+                            type="monotone"
+                            dataKey="upper_band"
+                            stroke="none"
+                            fill="url(#stabilityGradient)"
+                            baseLine={({ payload }) => payload.lower_band}
+                        />
+                        <Line
+                            type="monotone"
+                            dataKey="score"
+                            stroke="#4b78b4"
+                            strokeWidth={3}
+                            dot={{ r: 4, fill: "#4b78b4", strokeWidth: 0 }}
+                            activeDot={{ r: 6, fill: "#FFFFFF", stroke: "#4b78b4", strokeWidth: 2 }}
+                        />
+                        <Scatter
+                            data={volatileMonths}
+                            fill="#ea5b57"
+                            stroke="#FFFFFF"
+                            strokeWidth={2}
+                            r={6}
+                        />
+                    </ComposedChart>
+                </ResponsiveContainer>
+            </div>
         </div>
-    </div>
     );
 };
 

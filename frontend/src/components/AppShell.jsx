@@ -1,60 +1,67 @@
 import { Link } from "react-router-dom"
 
-const navItems = [
-  { label: "Overview", to: "/dashboard" },
-  { label: "Signals", to: "/dashboard" },
-  { label: "Analysis", to: "/dashboard" },
-  { label: "Workspace", to: "/dashboard" },
+const NAV_ITEMS = [
+  { label: "Home", to: "/" },
+  { label: "Access", to: "/login" },
+  { label: "Insights", to: "/dashboard" },
 ]
 
-export default function AppShell({ children }) {
+export default function AppShell({
+  activePath,
+  title = "SignalShift",
+  subtitle = "Intelligence Workspace",
+  searchPlaceholder = "Search workspace...",
+  shellClassName = "",
+  children,
+}) {
   return (
-    <div className="app-shell app-shell--dashboard">
-      <div className="app-shell__frame">
-        <header className="app-header">
-          <Link to="/" className="app-brand" aria-label="SignalShift home">
-            <span className="app-brand__mark">S</span>
-            <span className="app-brand__text">
-              <span className="app-brand__name">SignalShift</span>
-              <span className="app-brand__meta">Insight Workspace</span>
-            </span>
-          </Link>
+    <div className="app-page">
+      <div className={`app-shell ${shellClassName}`.trim()}>
+        <header className="shell-topbar">
+          <div className="shell-brand">
+            <div className="shell-brand__mark">S</div>
+            <div className="shell-brand__meta">
+              <span className="shell-brand__title">{title}</span>
+              {subtitle ? <span className="shell-brand__subtitle">{subtitle}</span> : null}
+            </div>
+          </div>
 
-          <nav className="app-nav" aria-label="Primary">
-            {navItems.map((item, index) => (
+          <nav className="shell-nav" aria-label="Primary">
+            {NAV_ITEMS.map((item) => (
               <Link
-                key={item.label}
-                className={`app-nav__item${index === 0 ? " is-active" : ""}`}
+                key={item.to}
                 to={item.to}
+                className={`shell-nav__link ${activePath === item.to ? "is-active" : ""}`.trim()}
               >
                 {item.label}
               </Link>
             ))}
           </nav>
 
-          <div className="app-header__tools">
-            <label className="app-search" aria-label="Search">
-              <span aria-hidden="true">⌕</span>
-              <input
-                type="text"
-                readOnly
-                value=""
-                placeholder="Search insight streams, issues, and reports"
-              />
-            </label>
-            <button className="app-icon-button" type="button" aria-label="Notifications">
-              ⊙
-            </button>
-            <button className="app-icon-button" type="button" aria-label="Settings">
-              ◌
-            </button>
-            <div className="app-avatar" aria-label="Current user">
-              SS
+          <div className="shell-actions">
+            <div className="shell-search">
+              <input type="text" placeholder={searchPlaceholder} aria-label="Search workspace" />
+              <span className="shell-search__icon">⌕</span>
+            </div>
+            <div className="shell-quick-actions">
+              <button className="shell-icon-button" aria-label="Workspace controls">
+                ⊙
+              </button>
+              <button className="shell-icon-button" aria-label="Notifications">
+                ◌
+              </button>
+              <div className="shell-profile">
+                <div className="shell-profile__avatar">SS</div>
+                <div className="shell-profile__meta">
+                  <strong>Ops Lead</strong>
+                  <span>SignalShift</span>
+                </div>
+              </div>
             </div>
           </div>
         </header>
 
-        <main className="app-content">{children}</main>
+        <main className="shell-body">{children}</main>
       </div>
     </div>
   )

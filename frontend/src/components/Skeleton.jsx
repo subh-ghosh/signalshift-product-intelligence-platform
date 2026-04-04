@@ -1,5 +1,3 @@
-import { useEffect, useState, useRef } from "react"
-
 // Clean Light Theme animated shimmer for loading states
 function SkeletonBlock({ width = "100%", height = 16, borderRadius = 6, style = {} }) {
     return (
@@ -7,8 +5,7 @@ function SkeletonBlock({ width = "100%", height = 16, borderRadius = 6, style = 
             width,
             height,
             borderRadius,
-            // Soft light-gray slate gradient
-            background: "linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%)",
+            background: "linear-gradient(90deg, #f4f5f8 25%, #e9ecf1 50%, #f4f5f8 75%)",
             backgroundSize: "200% 100%",
             animation: "shimmer 1.5s infinite linear",
             ...style
@@ -33,8 +30,7 @@ export function SkeletonKpiBar() {
         <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: "24px",
-            marginBottom: "32px",
+            gap: "14px",
             width: "100%"
         }}>
             {[1, 2, 3, 4].map(i => (
@@ -42,7 +38,8 @@ export function SkeletonKpiBar() {
                     display: "flex",
                     flexDirection: "column",
                     padding: "24px",
-                    gap: "12px"
+                    gap: "12px",
+                    background: "linear-gradient(180deg, #ffffff, #f3f4f7)"
                 }}>
                     {/* Top Row: Label and Icon */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
