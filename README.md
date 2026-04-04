@@ -1,26 +1,31 @@
-# SignalShift Platform
+# SignalShift: App Review NLP Analysis
 
-SignalShift is a production-grade Product Intelligence system for transforming unstructured customer feedback into prioritized, actionable insights. This repository captures the core architecture, teams, and tooling needed to deliver the 2026-standard platform described in the Product & Engineering Master Document.
+SignalShift is a Data Science project designed to analyze app reviews and automatically surface the most pressing negative issues. It leverages Natural Language Processing (NLP) to parse feedback from the Google Play Store (via Kaggle or CSV), categorize the issues using machine learning, and compute aggregate sentiment metrics.
 
-## Overview
-- **Problem:** Large volumes of feedback (reviews, tickets, surveys) are currently analyzed manually, causing slow detection of regressions, poor prioritization, and missing executive summaries.
-- **Solution:** A multi-tenant SaaS that ingests feedback, applies NLP + analytics, scores impact, detects anomalies, and shares insights via dashboards and alerts.
-- **Primary Stack:** Next.js 14 + TypeScript (frontend), FastAPI (backend), PostgreSQL, Redis, Dockerized services, and ML + pipeline tooling (Hugging Face, scikit-learn, BERTopic, Kafka in Phase 2).
+## Features
+- **Data Sync:** Instantly imports app review datasets from Kaggle or CSVs for analysis.
+- **Top Negative Issues:** Synthesizes feedback using ML (BERTopic, Transformers) to surface critical negative experiences and bugs.
+- **App Rating:** Computes an aggregate app rating and provides a high-level feedback metric over time.
 
-## Repository Layout
-- `backend/` – FastAPI service structured around API, services, models, and analytics helpers.
-- `frontend/` – Next.js 14 workspace with layouts, shared components, and data layer to consume the backend APIs.
-- `docs/` – Architecture, deployment, and onboarding docs keyed to the 2026 standard.
-- `infra/` – IaC helpers (Docker, Terraform templates, pipeline configs) to align with production expectations.
-- `data/` – Data pipeline code, preprocessing scripts, and sample schema definitions for ingestion, NLP, and scoring.
-- `observability/` – Shared logging, metrics, tracing, and alerting config.
-- `config/` – Environment templates, secrets vault reference, and rate-limiting/tenant isolation policy files.
+## Tech Stack
+- **Machine Learning:** Hugging Face Transformers (Sentiment Analysis), scikit-learn, BERTopic (Topic Modeling)
+- **Backend:** Python, FastAPI, Pandas
+- **Frontend:** React, Vite, Tailwind CSS
 
-## Getting Started
-1. Read `docs/architecture.md` for the system blueprint and component responsibilities.
-2. Install backend dependencies via `pip install -r backend/requirements.txt` (or `poetry install`) and initialize the database for the relevant tenant.
-3. Spin up the frontend with `pnpm install && pnpm dev` from `frontend/`.
-4. Use `infra/docker-compose.dev.yml` to run Redis, PostgreSQL, and other services locally mirroring the production stack.
+## Setup Intructions
 
-## Contributing
-Adhere to the engineering principles outlined in `docs/engineering-principles.md`: multi-tenant isolation, async-first, event-driven, scalable, structured logging, and idempotent ingestion. Every feature should have a matching test or contract and documentation that explains usage and failure handling.
+### 1. Backend Service
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+### 2. Frontend Dashboard
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Navigate to `http://localhost:5174` (or the respective Vite port) to interact with the dashboard.

@@ -9,7 +9,7 @@ from sentence_transformers import SentenceTransformer
 
 from app.ml.text_cleaner import clean_text
 from app.ml.spam_filter import is_valid_review
-from .alerting_service import AlertingService
+
 from app.ml.issue_labeler import generate_issue_label
 
 
@@ -89,7 +89,7 @@ class MLService:
             "Pricing/Subscription": ["expensive", "price", "money", "subscription", "plan", "cancel", "worth"],
         }
         
-        self.alerting_service = AlertingService()
+
         
         print("Loading SentenceTransformer (Dynamic Alignment Engine)...")
         # Lightweight but accurate model for semantic similarity reranking
@@ -881,7 +881,7 @@ class MLService:
 
         # Trigger Threshold Check
         print("[!] Checking critical thresholds...")
-        self.alerting_service.check_thresholds()
+
 
         self.progress["status"] = "complete"
         print(f"Successfully generated and cached new topic_analysis.csv for {total_valid} high-quality reviews (filtered {filtered_out} spam).")

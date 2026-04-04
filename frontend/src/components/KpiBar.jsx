@@ -68,22 +68,7 @@ export default function KpiBar({ limitMonths = 0 }) {
                 deltaIsPercent={false}
                 tooltip="Average star rating across all reviews."
             />
-            <KpiCard
-                icon="◔"
-                label="Customer Happiness"
-                value={`${kpis.positive_pct}%`}
-                delta={d.positive_pct}
-                deltaIsPercent={false}
-                tooltip="Percentage of reviews expressing positive emotional tone."
-            />
-            <KpiCard
-                icon="△"
-                label="Total Issues Found"
-                value={kpis.active_issues}
-                delta={d.active_issues}
-                deltaIsPercent={false}
-                tooltip="Number of distinct problem areas currently identified."
-            />
+
         </div>
     )
 }

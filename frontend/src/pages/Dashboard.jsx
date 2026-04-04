@@ -1,18 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import api from "../services/api"
 
-import SentimentChart from "../components/SentimentChart"
 import TopIssuesChart from "../components/TopIssuesChart"
-import VanguardAspectMap from "../components/VanguardAspectMap"
-import SentimentStabilityChart from "../components/SentimentStabilityChart"
-import TrendingChart from "../components/TrendingChart"
-import ExecutiveSummary from "../components/AiSummaryCard"
 import KpiBar from "../components/KpiBar"
-import SignalTicker from "../components/SignalTicker"
 import DiagnosticDrawer from "../components/DiagnosticDrawer"
-import VanguardAlerts from "../components/VanguardAlerts"
-import EmergingIssuesPanel from "../components/EmergingIssuesPanel"
-import SemanticDriftPanel from "../components/SemanticDriftPanel"
 import AppShell from "../components/AppShell"
 
 function rangeToMonths(r) {
@@ -294,9 +285,7 @@ export default function Dashboard() {
       shellClassName="app-shell--dashboard"
     >
       <div className="dashboard-workspace">
-        <div className="dashboard-ticker-card">
-          <SignalTicker />
-        </div>
+
 
         <section className="route-frame dashboard-overview">
           <div className="dashboard-hero-card">
@@ -373,18 +362,7 @@ export default function Dashboard() {
                   </div>
                 </section>
 
-                <section className="workspace-actions__group workspace-actions__group--exports">
-                  <div className="workspace-actions__group-head">
-                    <div>
-                      <h4>Exports</h4>
-                      <p>Download the current review window as a CSV or board-ready report.</p>
-                    </div>
-                  </div>
-                  <div className="dashboard-toolbar dashboard-toolbar--premium">
-                    <button className="btn-secondary" onClick={downloadCsv}>CSV</button>
-                    <button className="btn-primary" onClick={downloadExecutiveReport}>Report</button>
-                  </div>
-                </section>
+
 
                 <section className="workspace-actions__group workspace-actions__group--ingestion">
                   <div className="workspace-actions__group-head">
@@ -433,103 +411,11 @@ export default function Dashboard() {
           <div className="glass-card dashboard-panel dashboard-panel--wide">
             <div className="card-header">
               <div className="card-heading">
-                <h2>Problem Landscape</h2>
+                <h2>Top Negative Issues</h2>
               </div>
             </div>
             <div className="dashboard-problem-layout">
-              <div className="dashboard-merge-grid dashboard-merge-grid--problem-top">
-                <div className="dashboard-subpanel dashboard-subpanel--complaints">
-                  <TopIssuesChart key={`issues-${refreshKey}-${range}`} onIssueClick={handleIssueClick} limitMonths={limitMonths} />
-                </div>
-
-                <div className="dashboard-subpanel dashboard-subpanel--briefing">
-                  {!uploadLoading && !chartsLoading && (
-                    <ExecutiveSummary key={`ai-${refreshKey}-${range}`} range={range} />
-                  )}
-                </div>
-              </div>
-
-              <div className="dashboard-merge-grid dashboard-merge-grid--problem-bottom">
-                <div className="dashboard-subpanel dashboard-subpanel--alerts">
-                  <VanguardAlerts range={range} onAlertClick={handleAlertClick} />
-                </div>
-
-                <div className="dashboard-subpanel dashboard-subpanel--aspects">
-                  <VanguardAspectMap range={range} onAspectClick={(aspect) => openDrawer({ aspect })} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="route-frame dashboard-grid-half dashboard-section dashboard-section--core">
-          <div className="glass-card dashboard-panel dashboard-panel--compact dashboard-panel--sentiment">
-            <div className="card-header">
-              <div className="card-heading">
-                <h2>Sentiment Health</h2>
-              </div>
-            </div>
-            <div className="dashboard-merge-stack">
-              <div className="dashboard-subpanel dashboard-subpanel--sentiment">
-                <div className="dashboard-subpanel-fill dashboard-subpanel-fill--centered">
-                  <SentimentChart
-                    key={`sent-${refreshKey}-${range}`}
-                    limitMonths={limitMonths}
-                    onSentimentClick={(sentiment) => openDrawer({ topic: sentiment })}
-                  />
-                </div>
-              </div>
-              <div className="dashboard-subpanel dashboard-subpanel--stability">
-                <SentimentStabilityChart
-                  key={`stability-${refreshKey}-${range}`}
-                  limitMonths={limitMonths}
-                  onStabilityClick={(month) => openDrawer({ month })}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card dashboard-panel dashboard-panel--compact dashboard-panel--signals">
-            <div className="card-header">
-              <div className="card-heading">
-                <h2>Signals &amp; Shifts</h2>
-              </div>
-            </div>
-            <div className="dashboard-merge-stack dashboard-merge-stack--signals">
-              <div className="dashboard-subpanel dashboard-subpanel--timeline">
-                <TrendingChart key={`trending-${refreshKey}-${range}`} range={range} />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="route-frame dashboard-section dashboard-section--signal-lists">
-          <div className="glass-card dashboard-panel dashboard-panel--compact dashboard-panel--signal-lists-combined">
-            <div className="dashboard-merge-grid dashboard-merge-grid--signals">
-              <div className="dashboard-subpanel dashboard-subpanel--emerging">
-                <div className="card-header card-header--subpanel">
-                  <div className="card-heading">
-                    <h2>Watch</h2>
-                  </div>
-                </div>
-                <EmergingIssuesPanel key={`emerge-${refreshKey}-${range}`} limitMonths={limitMonths} />
-              </div>
-              <div className="dashboard-subpanel dashboard-subpanel--drift">
-                <div className="card-header card-header--subpanel">
-                  <div className="card-heading">
-                    <h2>New Issues</h2>
-                  </div>
-                </div>
-                <SemanticDriftPanel
-                  key={`drift-${refreshKey}-${range}`}
-                  limitMonths={limitMonths}
-                  onCategoryClick={(row) => openDrawer({
-                    aspect: row.category,
-                    title: row.category,
-                    subtitle: `${row.n_months} months sampled • Shift strength ${row.avg_drift.toFixed(2)}`,
-                  })}
-                />
-              </div>
+                <TopIssuesChart key={`issues-${refreshKey}-${range}`} onIssueClick={handleIssueClick} limitMonths={limitMonths} />
             </div>
           </div>
         </section>

@@ -1,11 +1,5 @@
 import { Link } from "react-router-dom"
 
-const NAV_ITEMS = [
-  { label: "Home", to: "/" },
-  { label: "Access", to: "/login" },
-  { label: "Insights", to: "/dashboard" },
-]
-
 export default function AppShell({
   activePath,
   title = "SignalShift",
@@ -27,15 +21,12 @@ export default function AppShell({
           </div>
 
           <nav className="shell-nav" aria-label="Primary">
-            {NAV_ITEMS.map((item) => (
               <Link
-                key={item.to}
-                to={item.to}
-                className={`shell-nav__link ${activePath === item.to ? "is-active" : ""}`.trim()}
+                to="/dashboard"
+                className="shell-nav__link is-active"
               >
-                {item.label}
+                Dashboard
               </Link>
-            ))}
           </nav>
 
           <div className="shell-actions">
