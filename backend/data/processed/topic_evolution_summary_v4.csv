@@ -1,5 +1,0 @@
-Metric,OLD LDA,V3 LDA,V4 NMF (Elite)
-Dataset Size,10000,2528,2528
-Noise Ratio,18.0%,0.0%,0.0%
-Primary Focus,General Talk,Customer Friction,Industry Friction
-Algorithm,LDA,LDA,NMF Precision
