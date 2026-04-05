@@ -27,7 +27,7 @@ The SignalShift ML pipeline has been fully evolved through three tiers. Below is
 ## Tier 1 DS Upgrades (Phase 22–24)
 
 ### Phase 22 — Semantic Zero-Shot Labeler
-#### [MODIFY] [issue_labeler.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/ml/issue_labeler.py)
+#### [MODIFY] [issue_labeler.py](backend/ml/issue_labeler.py)
 - Replaced rule-based `generate_issue_label()` with MiniLM cosine similarity
 - 12-category universal taxonomy (app-agnostic, works for any mobile/SaaS app)
 - `generate_issue_label(keywords, encoder=None)` — accepts pre-loaded encoder to avoid double load
@@ -38,7 +38,7 @@ The SignalShift ML pipeline has been fully evolved through three tiers. Below is
 - Superseded: Phase 24 eliminates duplicates upstream
 
 ### Phase 24 — Direct Per-Review Semantic Classification
-#### [MODIFY] [ml_service.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/services/ml_service.py)
+#### [MODIFY] [ml_service.py](backend/app/services/ml_service.py)
 - **Classification**: `(N_reviews, 384) @ (384, 12) → (N, 12)` similarity matrix; argmax = category
 - **NMF role**: Downgraded to ABSA aspect detection only, not categorization
 - **Confidence routing**: `< 0.30` → `"General App Feedback"` + anomaly pool
@@ -49,19 +49,19 @@ The SignalShift ML pipeline has been fully evolved through three tiers. Below is
 ## Tier 2 DS Upgrades (Phase 25)
 
 ### Phase 25.1 — Silhouette Score Quality Benchmarking
-#### [MODIFY] [ml_service.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/services/ml_service.py)
+#### [MODIFY] [ml_service.py](backend/app/services/ml_service.py)
 - Samples up to 50 reviews/category, computes `silhouette_score(metric="cosine")`
 - Output: `data/processed/classification_quality.csv`
 
 ### Phase 25.2 — Temporal Semantic Drift Detection
-#### [MODIFY] [ml_service.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/services/ml_service.py)
+#### [MODIFY] [ml_service.py](backend/app/services/ml_service.py)
 - Tracks up to 30 review texts per (category, month) during batch
 - Monthly centroid embeddings, consecutive cosine drift computed
 - `drift_score > 0.15` → `is_evolving = True`
 - Output: `data/processed/semantic_drift.csv`
 
 ### Phase 25.3 — Neural Topic Discovery Tool
-#### [NEW] [neural_topic_discovery.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/ml/neural_topic_discovery.py)
+#### [NEW] [neural_topic_discovery.py](backend/ml/neural_topic_discovery.py)
 - Standalone script: NMF on MiniLM embeddings (RELU shift for non-negativity)
 - Discovers semantic clusters not in the predefined taxonomy
 - Outputs `data/processed/neural_topics.csv` with top-5 representative reviews per cluster
@@ -71,21 +71,21 @@ The SignalShift ML pipeline has been fully evolved through three tiers. Below is
 ## Tier 3 DS Upgrades (Phase 26–28)
 
 ### Phase 26 — Severity Scoring
-#### [MODIFY] [ml_service.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/services/ml_service.py)
+#### [MODIFY] [ml_service.py](backend/app/services/ml_service.py)
 - `compute_severity(text)` → score 1.0–5.0
 - Lexicon: `SEVERITY_5` (scam/fraud), `SEVERITY_4` (terrible/refund), `SEVERITY_3` (crash/bug)
 - Signals: caps ratio, exclamation density
 - `avg_severity` column added to `topic_analysis.csv`
 
 ### Phase 27 — Anomaly / Emerging Issue Detection
-#### [MODIFY] [ml_service.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/services/ml_service.py)
+#### [MODIFY] [ml_service.py](backend/app/services/ml_service.py)
 - Pools low-confidence reviews during classification (`low_conf_reviews` list)
 - Post-batch: NMF on embedding space of pooled reviews
 - Clusters with `≥ 20` reviews exported; `≥ 40` flagged as high-priority
 - Output: `data/processed/emerging_issues.csv`
 
 ### Phase 28 — Few-Shot Fine-Tuning Infrastructure
-#### [NEW] [finetune_encoder.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/ml/finetune_encoder.py)
+#### [NEW] [finetune_encoder.py](backend/ml/finetune_encoder.py)
 - Input: `data/labeled/review_labels.csv` (`review`, `category` columns)
 - Builds anchor/positive/negative triplets per category
 - Trains with `TripletLoss` for 3 epochs, saves to `models/finetuned_encoder/`
@@ -126,6 +126,6 @@ The SignalShift ML pipeline has been fully evolved through three tiers. Below is
 - `semantic_drift.csv` — monitor `is_evolving = True` categories for root-cause changes
 
 ### When labeled data available
-- Run `python app/ml/finetune_encoder.py`
+- Run `python ml/finetune_encoder.py`
 - Target accuracy on labeled set: `> 85%` before switching to fine-tuned model
 - Update `ml_service.py` encoder path to `models/finetuned_encoder/`

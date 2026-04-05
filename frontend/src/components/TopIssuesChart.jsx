@@ -16,7 +16,7 @@ function getVelocityMeta(direction, label) {
   return { label: "Stable", color: "#72788c", bg: "rgba(114, 120, 140, 0.12)" }
 }
 
-export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
+export default function TopIssuesChart({ onIssueClick }) {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -24,7 +24,7 @@ export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
     const fetchIssues = async () => {
       setLoading(true)
       try {
-        const res = await api.get("/dashboard/top-issues", { params: { limit_months: limitMonths } })
+        const res = await api.get("/dashboard/top-issues")
         const filtered = (res.data || []).filter((item) => item.issue !== "General App Feedback")
         setData(filtered)
       } catch (err) {
@@ -36,7 +36,7 @@ export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
     }
 
     fetchIssues()
-  }, [limitMonths])
+  }, [])
 
   if (loading) {
     return <SkeletonChart height={420} />
@@ -84,9 +84,6 @@ export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
                     <div className="complaints-row__meta">
                       <span className="complaints-chip" style={{ color: severity.color, background: severity.bg }}>
                         {severity.label}
-                      </span>
-                      <span className="complaints-chip" style={{ color: velocity.color, background: velocity.bg }}>
-                        {velocity.label}
                       </span>
                     </div>
                   </div>

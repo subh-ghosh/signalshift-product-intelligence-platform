@@ -29,16 +29,16 @@ A "Voice of the Customer" (VoC) dashboard for product managers. It takes thousan
 ## 📂 Key Files
 
 ### 🧠 Backend
-- [ml_service.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/services/ml_service.py): Core batch inference pipeline
-- [issue_labeler.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/ml/issue_labeler.py): 12-category universal taxonomy + MiniLM zero-shot labeler
-- [ai_summary_service.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/services/ai_summary_service.py): Windowed AI executive summary
-- [neural_topic_discovery.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/ml/neural_topic_discovery.py): Offline tool — NMF on embeddings to find unknown issues
-- [finetune_encoder.py](file:///media/subh/Shared%20Storage/signalshift/backend/app/ml/finetune_encoder.py): Few-shot fine-tuning with triplet loss
+- [ml_service.py](backend/app/services/ml_service.py): Core batch inference pipeline
+- [issue_labeler.py](backend/ml/issue_labeler.py): 12-category universal taxonomy + MiniLM zero-shot labeler
+- [ai_summary_service.py](backend/app/services/ai_summary_service.py): Windowed AI executive summary
+- [neural_topic_discovery.py](backend/ml/neural_topic_discovery.py): Offline tool — NMF on embeddings to find unknown issues
+- [finetune_encoder.py](backend/ml/finetune_encoder.py): Few-shot fine-tuning with triplet loss
 
 ### 💻 Frontend
-- [Dashboard.jsx](file:///media/subh/Shared%20Storage/signalshift/frontend/src/pages/Dashboard.jsx): Main UI — range state owner
-- [TrendingChart.jsx](file:///media/subh/Shared%20Storage/signalshift/frontend/src/components/TrendingChart.jsx): Time-series with 3M/6M/12M/ALL controls
-- [AiSummaryCard.jsx](file:///media/subh/Shared%20Storage/signalshift/frontend/src/components/AiSummaryCard.jsx): Live AI insights synced to chart range
+- [Dashboard.jsx](frontend/src/pages/Dashboard.jsx): Main UI — range state owner
+- [TrendingChart.jsx](frontend/src/components/TrendingChart.jsx): Time-series with 3M/6M/12M/ALL controls
+- [AiSummaryCard.jsx](frontend/src/components/AiSummaryCard.jsx): Live AI insights synced to chart range
 
 ---
 

@@ -30,7 +30,7 @@ Raw Reviews → Spam Filter → NMF (30 components, TF-IDF) → Rule-based Label
 ---
 
 ### Phase 22 — Semantic Zero-Shot Labeling
-**File:** `app/ml/issue_labeler.py` (full rewrite)
+**File:** `ml/issue_labeler.py` (full rewrite)
 
 Replaced rule-based `issue_labeler` with **MiniLM zero-shot cosine similarity** against a 12-category universal taxonomy.
 
@@ -92,10 +92,10 @@ silhouette_score, 0.XXXX, 12, N, 0.30, 0.85
 - Output: `data/processed/semantic_drift.csv`
 
 #### 25.3 — Neural Topic Discovery Tool
-- **File:** `app/ml/neural_topic_discovery.py`
+- **File:** `ml/neural_topic_discovery.py`
 - Runs NMF on MiniLM sentence embeddings (not TF-IDF) to discover clusters in semantic space
 - Surfaces unknown emerging issues not covered by taxonomy
-- Run offline: `python app/ml/neural_topic_discovery.py`
+- Run offline: `python ml/neural_topic_discovery.py`
 
 ---
 
@@ -124,7 +124,7 @@ SEVERITY_3_WORDS = {"crash", "bug", "error", "slow", "annoying"}     # +0.5
 ---
 
 ### Phase 28 — Tier 3: Few-Shot Fine-Tuning Script
-**File:** `app/ml/finetune_encoder.py`
+**File:** `ml/finetune_encoder.py`
 
 Full contrastive training loop using **triplet loss** on labeled review data:
 ```

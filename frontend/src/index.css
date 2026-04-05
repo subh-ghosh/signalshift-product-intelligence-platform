@@ -2988,3 +2988,33 @@ input[type="password"] {
     min-width: 0;
   }
 }
+
+/* Discovery Progress */
+.discovery-progress {
+  margin-top: 16px;
+  width: 100%;
+}
+
+.discovery-progress__bar {
+  height: 6px;
+  background: var(--surface-muted);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.discovery-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--blue));
+  transition: width 0.4s ease;
+}
+
+.discovery-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

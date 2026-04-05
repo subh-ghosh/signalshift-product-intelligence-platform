@@ -4,11 +4,11 @@ SignalShift is a Data Science project designed to analyze app reviews and automa
 
 ## Features
 - **Data Sync:** Instantly imports app review datasets from Kaggle or CSVs for analysis.
-- **Top Negative Issues:** Synthesizes feedback using ML (BERTopic, Transformers) to surface critical negative experiences and bugs.
+- **Top Negative Issues:** Synthesizes feedback to surface critical negative experiences and bugs.
 - **App Rating:** Computes an aggregate app rating and provides a high-level feedback metric over time.
 
 ## Tech Stack
-- **Machine Learning:** Hugging Face Transformers (Sentiment Analysis), scikit-learn, BERTopic (Topic Modeling)
+- **Machine Learning:** Scikit-learn (Bi-gram TF-IDF + Logistic Regression) and SentenceTransformers (MiniLM issue classification)
 - **Backend:** Python, FastAPI, Pandas
 - **Frontend:** React, Vite, Tailwind CSS
 

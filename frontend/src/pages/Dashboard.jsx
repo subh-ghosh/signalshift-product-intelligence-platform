@@ -6,25 +6,20 @@ import KpiBar from "../components/KpiBar"
 import DiagnosticDrawer from "../components/DiagnosticDrawer"
 import AppShell from "../components/AppShell"
 
-function rangeToMonths(r) {
-  const map = { "3M": 3, "6M": 6, "12M": 12, "ALL": 0 }
-  return map[r] ?? 0
-}
+function getProgressStage(status) {
+  if (!status) return "Working"
 
-function TimelineSelector({ range, setRange }) {
-  return (
-    <div className="toolbar-group" role="group" aria-label="Time period">
-      {["3M", "6M", "12M", "ALL"].map((option) => (
-        <button
-          key={option}
-          className={`pill-button ${range === option ? "is-active" : ""}`.trim()}
-          onClick={() => setRange(option)}
-        >
-          {option}
-        </button>
-      ))}
-    </div>
-  )
+  if (status === "downloading") return "Downloading dataset"
+  if (status === "unzipping") return "Preparing files"
+  if (status === "download_complete") return "Download complete"
+  if (status === "sentiment") return "Running sentiment model"
+  if (status === "stopping") return "Stopping early"
+  if (status === "complete") return "Analysis complete"
+  if (status === "error") return "Analysis failed"
+  if (status.startsWith("Analyzing topics")) return "Finding issue categories"
+  if (status === "analyzing") return "Finding issue categories"
+
+  return status
 }
 
 export default function Dashboard() {
@@ -35,9 +30,6 @@ export default function Dashboard() {
   const [chartsLoading, setChartsLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [progress, setProgress] = useState({ processed: 0, total: 0, status: "idle", eta_seconds: 0 })
-
-  const [range, setRange] = useState("ALL")
-  const limitMonths = rangeToMonths(range)
 
   const [drawer, setDrawer] = useState({
     open: false,
@@ -84,10 +76,14 @@ export default function Dashboard() {
           setProgress(res.data)
           failCount = 0
 
-          if (res.data.status === "complete" || res.data.status === "idle") {
+          if (res.data.status === "complete") {
             clearInterval(progressInterval.current)
-            onAnalysisComplete(res.data.status === "complete" ? "Analysis complete!" : "")
+            onAnalysisComplete("Analysis complete!")
             resolve()
+          } else if (res.data.status === "idle" && !uploadLoading) {
+             // Stay idle if we haven't started anything
+             clearInterval(progressInterval.current)
+             resolve()
           }
 
           if (res.data.status === "error") {
@@ -113,7 +109,7 @@ export default function Dashboard() {
     const checkInitialStatus = async () => {
       try {
         const res = await api.get("/upload-progress")
-        if (["sentiment", "processing", "topic"].includes(res.data.status)) {
+        if (["sentiment", "processing", "topic", "downloading", "unzipping", "download_complete"].includes(res.data.status)) {
           setProgress(res.data)
           setUploadLoading(true)
           startPolling()
@@ -181,7 +177,7 @@ export default function Dashboard() {
     try {
       setChartsLoading(true)
       const res = await api.get("/dashboard/issue-reviews", {
-        params: { issue: keywords, limit_months: limitMonths },
+        params: { issue: keywords },
       })
       const nextReviews = res.data.reviews || []
       const nextKeywords = res.data.keywords || ""
@@ -228,16 +224,14 @@ export default function Dashboard() {
 
   const downloadCsv = async () => {
     try {
-      setStatus(`Exporting CSV (${range === "ALL" ? "All Time" : `Last ${range}`})...`)
+      setStatus("Exporting CSV (All Time)...")
       const res = await api.get("/dashboard/export-csv", {
         responseType: "blob",
-        params: { limit_months: limitMonths },
       })
       const url = window.URL.createObjectURL(new Blob([res.data]))
       const link = document.createElement("a")
       link.href = url
-      const windowStr = range === "ALL" ? "AllTime" : range
-      link.setAttribute("download", `SignalShift_Reviews_${windowStr}_${new Date().toISOString().split("T")[0]}.csv`)
+      link.setAttribute("download", `SignalShift_Reviews_AllTime_${new Date().toISOString().split("T")[0]}.csv`)
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -252,16 +246,14 @@ export default function Dashboard() {
 
   const downloadExecutiveReport = async () => {
     try {
-      setStatus(`Generating PDF (${range === "ALL" ? "All Time" : `Last ${range}`})...`)
+      setStatus("Generating PDF (All Time)...")
       const res = await api.get("/dashboard/export-pdf", {
         responseType: "blob",
-        params: { limit_months: limitMonths },
       })
       const url = window.URL.createObjectURL(new Blob([res.data]))
       const link = document.createElement("a")
       link.href = url
-      const windowStr = range === "ALL" ? "AllTime" : range
-      link.setAttribute("download", `SignalShift_Report_${windowStr}_${new Date().toISOString().split("T")[0]}.pdf`)
+      link.setAttribute("download", `SignalShift_Report_AllTime_${new Date().toISOString().split("T")[0]}.pdf`)
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -275,6 +267,7 @@ export default function Dashboard() {
   }
 
   const progressPct = progress.total > 0 ? Math.round((progress.processed / progress.total) * 100) : 0
+  const progressStage = getProgressStage(progress.status)
 
   return (
     <AppShell
@@ -289,46 +282,32 @@ export default function Dashboard() {
 
         <section className="route-frame dashboard-overview">
           <div className="dashboard-hero-card">
-            <div className="dashboard-hero-content">
               <div className="dashboard-stage__intro">
-                <span className="eyebrow">Executive Workspace</span>
-                <h1>SignalShift Insights</h1>
+                <span className="eyebrow">Issue Intelligence</span>
+                <h1>SignalShift Discovery</h1>
                 <div className="dashboard-stage__meta">
-                  <span className="tag">Analysis Center</span>
-                  <span className="muted-note">{range === "ALL" ? "All-time review window" : `Active window: last ${range}`}</span>
+                  <span className="tag">Bug Discovery Center</span>
                   {status && (
                     <span className={`status-text ${status.toLowerCase().includes("fail") ? "is-error" : "is-success"}`}>
                       {status}
                     </span>
                   )}
                 </div>
-              </div>
-
-              {uploadLoading && progress.total > 0 && (
-                <div className="glass-card dashboard-progress-card">
-                  <div className="progress-shell">
-                    <div className="progress-bar">
-                      <div className="progress-bar__fill" style={{ width: `${progressPct}%` }} />
+                {uploadLoading && progress.total > 0 && (
+                  <div className="discovery-progress">
+                    <div className="discovery-progress__bar">
+                      <div 
+                        className="discovery-progress__fill" 
+                        style={{ width: `${(progress.processed / progress.total) * 100}%` }}
+                      ></div>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                      <span className="status-text">
-                        {progress.status === "downloading" || progress.status === "unzipping"
-                          ? `${progress.processed}%`
-                          : `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()} reviews (${progressPct}%)`}
-                      </span>
-                      {progress.eta_seconds > 0 && (
-                        <span className="muted-note">
-                          ETA {progress.eta_seconds > 60
-                            ? `${Math.floor(progress.eta_seconds / 60)}m ${progress.eta_seconds % 60}s`
-                            : `${progress.eta_seconds}s`}
-                        </span>
-                      )}
+                    <div className="discovery-progress__meta">
+                      <span>{progressStage}</span>
+                      <span>{progressPct}%</span>
                     </div>
                   </div>
-                </div>
-              )}
-
-              <KpiBar key={`kpi-${refreshKey}-${range}`} limitMonths={limitMonths} />
+                )}
+              </div>
 
               <div className="dashboard-hero-gridfill" aria-hidden="true">
                 <div className="dashboard-hero-gridfill__rail dashboard-hero-gridfill__rail--tall" />
@@ -337,9 +316,8 @@ export default function Dashboard() {
                 <div className="dashboard-hero-gridfill__rail dashboard-hero-gridfill__rail--wide" />
               </div>
             </div>
-          </div>
 
-          <div className="dashboard-side-stack">
+            <div className="dashboard-side-stack">
             <div className="dashboard-actions-card">
               <div className="dashboard-actions__header">
                 <div>
@@ -352,13 +330,9 @@ export default function Dashboard() {
                 <section className="workspace-actions__group">
                   <div className="workspace-actions__group-head">
                     <div>
-                      <h4>Time Range</h4>
-                      <p>Control the active analysis window for this workspace.</p>
+                      <h4>Issue Intelligence</h4>
+                      <p>Holistic discovery across all historical review data.</p>
                     </div>
-                    <span className="workspace-actions__badge">{range === "ALL" ? "All Time" : `Last ${range}`}</span>
-                  </div>
-                  <div className="dashboard-toolbar dashboard-toolbar--premium">
-                    <TimelineSelector range={range} setRange={setRange} />
                   </div>
                 </section>
 
@@ -415,7 +389,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="dashboard-problem-layout">
-                <TopIssuesChart key={`issues-${refreshKey}-${range}`} onIssueClick={handleIssueClick} limitMonths={limitMonths} />
+                <TopIssuesChart key={`issues-${refreshKey}`} onIssueClick={handleIssueClick} />
             </div>
           </div>
         </section>

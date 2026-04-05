@@ -8,7 +8,7 @@ The major breakthrough in V4 was the swap from LDA to **NMF (Non-negative Matrix
 - **After (V4)**: NMF with TF-IDF mathematically isolates the most unique "Industry Friction" terms, resulting in 100% noise-free clusters.
 
 ## 2. Qualitative Benchmarking (Research Impact)
-Detailed results can be found in [Topic_Benchmark_Final.md](file:///media/subh/Shared%20Storage/signalshift/backend/research_docs/summaries/Topic_Benchmark_Final.md).
+Detailed results can be found in [Topic_Benchmark_Final.md](backend/research_docs/summaries/Topic_Benchmark_Final.md).
 
 | Metric | OLD Strategy (LDA) | Elite V4 (NMF) |
 | :--- | :--- | :--- |

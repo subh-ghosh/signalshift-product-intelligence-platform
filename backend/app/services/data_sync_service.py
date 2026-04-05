@@ -9,15 +9,15 @@ except ImportError:
     KaggleApi = None
 
 class DataSyncService:
-    def __init__(self, data_dir="data/raw"):
+    def __init__(self, data_dir="data/testing/raw"):
         self.data_dir = data_dir
         self.dataset_id = "ashishkumarak/netflix-reviews-playstore-daily-updated"
         self.filename = "netflix_reviews.csv"
-        self.sync_meta_path = "data/sync_metadata.json"
+        self.sync_meta_path = "data/testing/sync_metadata.json"
         
         # Ensure directories exist
         os.makedirs(self.data_dir, exist_ok=True)
-        os.makedirs("data/processed", exist_ok=True)
+        os.makedirs("data/testing/processed", exist_ok=True)
         
         self.api = None
         if KaggleApi:
