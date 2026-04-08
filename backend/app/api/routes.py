@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import List
@@ -6,7 +6,6 @@ import pandas as pd
 import os
 import io
 
-from app.services.csv_processor import process_uploaded_csv
 from app.services.data_sync_service import DataSyncService
 
 from fastapi.responses import FileResponse
@@ -155,7 +154,10 @@ def top_issues():
             if len(issues) >= 10:
                 break
         return issues
-    except FileNotFoundError:
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        return []
+    except Exception as e:
+        print(f"[top-issues] error: {e}")
         return []
 
 
@@ -265,6 +267,8 @@ def dashboard_kpis():
             topic_df = pd.read_csv(os.path.join(TESTING_PROCESSED_DIR, "topic_analysis.csv"))
             if not topic_df.empty and "mentions" in topic_df.columns:
                 active_issues = int(topic_df["mentions"].fillna(0).gt(0).sum())
+        except (FileNotFoundError, pd.errors.EmptyDataError):
+            pass
         except Exception:
             pass
 
@@ -375,6 +379,13 @@ def sync_kaggle(background_tasks: BackgroundTasks):
     """Triggers a download from Kaggle and starts analysis in the background"""
     if ml_service is None:
         return {"error": "ML service not initialized"}
+
+    kaggle_error = sync_service.get_kaggle_ready_error()
+    if kaggle_error:
+        raise HTTPException(status_code=400, detail=kaggle_error)
+
+    # Starting a new job clears any previous stop request.
+    ml_service.should_stop = False
         
     # Initialize progress for the download phase immediately
     ml_service.progress["processed"] = 0
@@ -434,11 +445,25 @@ def _process_kaggle_sync_job():
 def _process_reviews_job(df: pd.DataFrame):
     """Inference-only analysis for uploaded/synced CSV data using pre-trained models."""
     try:
+        # A previous run may have been stopped mid-way; starting a new background job
+        # should always clear the stop flag.
+        ml_service.should_stop = False
+
         reviews = df["content"].astype(str).tolist()
         
         # Inference only: never retrain models from uploaded CSV data.
-        # Phase 1: Sentiment
-        sentiments = ml_service.predict_sentiment_batch(reviews)
+        # Phase 1: Sentiment (skip if the column already exists and is populated)
+        sentiments = None
+        if "sentiment" in df.columns:
+            try:
+                sent = df["sentiment"].astype(str).str.lower()
+                if sent.notna().all() and sent.isin(["positive", "negative"]).all():
+                    sentiments = sent.tolist()
+            except Exception:
+                sentiments = None
+
+        if sentiments is None:
+            sentiments = ml_service.predict_sentiment_batch(reviews)
         
         # If stopped early, we only keep the rows we actually have sentiments for
         if ml_service.should_stop:
@@ -463,6 +488,48 @@ def _process_reviews_job(df: pd.DataFrame):
         ml_service.progress["status"] = "error"
 
 
+@router.post("/reanalyze-latest")
+def reanalyze_latest(background_tasks: BackgroundTasks):
+    """Re-runs analysis from the latest saved uploaded/synced dataset.
+
+    Useful after clicking Stop mid-run: it rebuilds topic caches from
+    data/testing/processed/uploaded_reviews.csv.
+    """
+    if ml_service is None:
+        return {"error": "ML service not initialized"}
+
+    uploaded = os.path.join(TESTING_PROCESSED_DIR, "uploaded_reviews.csv")
+    cleaned = os.path.join(TESTING_PROCESSED_DIR, "cleaned_reviews.csv")
+    src = uploaded if os.path.exists(uploaded) else cleaned if os.path.exists(cleaned) else None
+    if not src:
+        raise HTTPException(status_code=404, detail="No uploaded/synced dataset found to reanalyze")
+
+    try:
+        df = pd.read_csv(src)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read dataset: {e}")
+
+    if "content" not in df.columns:
+        possible_columns = ["content", "review", "text", "comment", "review_text", "body"]
+        review_column = None
+        for col in possible_columns:
+            if col in df.columns:
+                review_column = col
+                break
+        if review_column is None:
+            raise HTTPException(status_code=400, detail="Dataset must contain a review/content column")
+        df["content"] = df[review_column]
+
+    # Initialize progress early
+    ml_service.progress["total"] = len(df)
+    ml_service.progress["processed"] = 0
+    ml_service.progress["status"] = "sentiment"
+    ml_service.progress["eta_seconds"] = 0
+
+    background_tasks.add_task(_process_reviews_job, df)
+    return {"message": "Reanalysis started from latest dataset", "source": os.path.basename(src), "total_reviews": len(df)}
+
+
 # -----------------------------
 # Upload Reviews CSV
 # -----------------------------
@@ -473,6 +540,9 @@ def _process_reviews_job(df: pd.DataFrame):
 async def upload_reviews(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     if ml_service is None:
         return {"error": "ML service not initialized"}
+
+    # Starting a new job clears any previous stop request.
+    ml_service.should_stop = False
 
     content = await file.read()
     # Processing heavy pandas CSV parsing in a worker thread

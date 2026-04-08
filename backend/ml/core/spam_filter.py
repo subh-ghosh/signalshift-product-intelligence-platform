@@ -1,5 +1,21 @@
 import re
-from langdetect import detect, LangDetectException
+from langdetect import detect, LangDetectException, DetectorFactory
+
+
+# Make langdetect deterministic across runs
+DetectorFactory.seed = 0
+
+
+_USELESS_PATTERNS = [
+    re.compile(r"^very good( app)?\.?$"),
+    re.compile(r"^very bad( app)?\.?$"),
+    re.compile(r"^(really )?nice app\.?$"),
+    re.compile(r"^worst app ever\.?$"),
+    re.compile(r"^i love this app\.?$"),
+    re.compile(r"^worse than before\.?$"),
+]
+
+_EXCESS_CHAR_REPEAT_RE = re.compile(r"(.)\1{4,}")
 
 def is_valid_review(text: str) -> bool:
     """
@@ -30,24 +46,16 @@ def is_valid_review(text: str) -> bool:
 
     # 2. Generic/Useless Single-Thought Filters
     # These often pass length checks but add 0 value to the mathematical clusters
-    useless_patterns = [
-        r"^very good( app)?\.?$",
-        r"^very bad( app)?\.?$",
-        r"^(really )?nice app\.?$",
-        r"^worst app ever\.?$",
-        r"^i love this app\.?$",
-        r"^worse than before\.?$"
-    ]
     text_lower = text.lower()
-    for p in useless_patterns:
-        if re.match(p, text_lower):
+    for pattern in _USELESS_PATTERNS:
+        if pattern.match(text_lower):
             return False
 
     # 3. Entropy / Repetitiveness Check (Keyboard Smashes)
     # E.g., "aaaaaaaaa", "hfjdkfhdjkf", "good good good good"
     
     # Check for excessive character repetition (e.g., "woooooooow")
-    if re.search(r"(.)\1{4,}", text_lower): 
+    if _EXCESS_CHAR_REPEAT_RE.search(text_lower):
         return False
         
     # Check for excessive word repetition 

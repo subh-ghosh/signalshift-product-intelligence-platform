@@ -36,6 +36,7 @@ def build_issue_embedding_artifacts():
 
 def save_issue_embeddings(data, path=MODEL_PATH):
     print("Saving semantic issue embeddings...")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as handle:
         pickle.dump(data, handle)
     print("Issue embeddings created successfully.")

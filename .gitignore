@@ -4,3 +4,16 @@ __pycache__/
 /.venv/
 backend/venv/
 frontend/node_modules/
+
+# Local exports / one-off artifacts
+rev.json
+sev.json
+
+# Generated dashboard caches + sync downloads
+backend/data/testing/processed/*.csv
+backend/data/testing/raw/
+backend/data/testing/sync_metadata.json
+
+# Training datasets (raw + processed)
+backend/data/training/raw/
+backend/data/training/processed/

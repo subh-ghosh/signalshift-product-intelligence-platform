@@ -12,6 +12,21 @@ The backend is a FastAPI service that exposes multi-tenant ingestion, scoring, a
 - `scripts/` – tooling scripts (seed tenants, run migrations).
 
 ### Development
-1. Create a `.env` from `.env.example` with database, redis, and jwt secrets.
-2. Run migrations via `alembic upgrade head`.
-3. Start the API with `uvicorn app.api.main:app --reload`.
+This repo is intended to run in a local virtual environment (`.venv`).
+On some Linux distros, the system Python may not include `pip` or common ML
+packages, so using `.venv` avoids “missing pandas/sklearn” errors.
+
+1. Create and activate a virtual environment:
+	- `python3 -m venv .venv`
+	- `source .venv/bin/activate`
+2. Install dependencies:
+	- `python -m pip install -r requirements.txt`
+
+3. (Optional) Train/rebuild ML artifacts (writes to `backend/models/`):
+	- `python -u ml/pipeline/01_preprocessing.py`
+	- `python -u ml/pipeline/02_vectorization.py`
+	- `python -u ml/pipeline/03_train_sentiment_model.py`
+	- `python -u ml/pipeline/04_create_issue_embeddings.py`
+
+4. Start the API:
+	- `uvicorn app.main:app --reload --port 8002`

@@ -1,15 +1,14 @@
 import heapq
-import joblib
 import os
-import pickle
 import time
 
 import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 
-from ml.core.issue_labeler import _build_taxonomy_embeddings
-import ml.core.issue_labeler as issue_labeler_module
+from app.services.paths import models_dir
+from app.services.sentiment_artifacts import load_sentiment_artifacts
+from app.services.taxonomy_embeddings import load_taxonomy_embeddings
 from ml.core.spam_filter import is_valid_review
 from ml.core.text_cleaner import clean_text
 
@@ -27,14 +26,12 @@ class MLService:
     def __init__(self):
         print("Loading ML models...")
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        model_dir = os.path.join(base_dir, "models")
+        model_dir = models_dir()
 
-        self.sentiment_model = joblib.load(os.path.join(model_dir, "sentiment_model.joblib"))
-        self.vectorizer = joblib.load(os.path.join(model_dir, "tfidf_vectorizer.joblib"))
+        self.sentiment_model, self.vectorizer = load_sentiment_artifacts(model_dir)
         self.encoder = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
 
-        self.taxonomy_labels, self.taxonomy_matrix = self._load_taxonomy_embeddings(model_dir)
+        self.taxonomy_labels, self.taxonomy_matrix = load_taxonomy_embeddings(model_dir, encoder=self.encoder)
 
         self.progress = {
             "processed": 0,
@@ -46,20 +43,6 @@ class MLService:
         self.should_stop = False
 
         print("ML models loaded successfully.")
-
-    def _load_taxonomy_embeddings(self, model_dir):
-        embeddings_path = os.path.join(model_dir, "topic_embeddings.pkl")
-        if os.path.exists(embeddings_path):
-            with open(embeddings_path, "rb") as handle:
-                data = pickle.load(handle)
-            labels = data.get("topics", [])
-            embeddings = np.array(data.get("embeddings", []))
-            if labels and embeddings.size:
-                return labels, embeddings
-
-        issue_labeler_module._encoder = self.encoder
-        _build_taxonomy_embeddings()
-        return issue_labeler_module._taxonomy_labels, issue_labeler_module._taxonomy_embeddings
 
     def _update_eta(self, processed, total, start_time):
         if processed == 0 or start_time is None:
@@ -82,7 +65,6 @@ class MLService:
         return self.sentiment_model.predict(vector)[0]
 
     def predict_sentiment_batch(self, reviews):
-        self.should_stop = False
         total = len(reviews)
         self.progress["total"] = total
         self.progress["processed"] = 0
@@ -179,7 +161,7 @@ class MLService:
         return [{"issue": issue, "mentions": count} for issue, count in sorted_issues[:10]]
 
     def generate_topic_analysis_cache(self, df):
-        self.should_stop = False
+        stop_requested_at_start = self.should_stop
         self.progress["status"] = "analyzing"
 
         if "sentiment" in df.columns:
@@ -199,21 +181,73 @@ class MLService:
             self.progress["status"] = "idle"
             return
 
-        mask = negative_df["content"].astype(str).apply(is_valid_review)
-        valid_df = negative_df[mask].copy().reset_index(drop=True)
+        # Filtering can be expensive (langdetect per row). Do it in batches and report progress
+        # so the UI doesn't look stuck on large datasets.
+        raw_reviews = negative_df["content"].astype(str).tolist()
+        raw_dates = self._extract_months(negative_df)
+        raw_versions = negative_df["appVersion"].astype(str).tolist() if "appVersion" in negative_df.columns else ["N/A"] * len(negative_df)
+        raw_upvotes = negative_df["thumbsUpCount"].fillna(0).astype(int).tolist() if "thumbsUpCount" in negative_df.columns else [0] * len(negative_df)
 
-        reviews = valid_df["content"].astype(str).tolist()
-        dates = self._extract_months(valid_df)
-        versions = valid_df["appVersion"].astype(str).tolist() if "appVersion" in valid_df.columns else ["N/A"] * len(valid_df)
-        upvotes = valid_df["thumbsUpCount"].fillna(0).astype(int).tolist() if "thumbsUpCount" in valid_df.columns else [0] * len(valid_df)
+        self.progress["status"] = "filtering"
+        self.progress["total"] = total_negative
+        self.progress["processed"] = 0
+        self.progress["start_time"] = time.time()
+
+        reviews = []
+        dates = []
+        versions = []
+        upvotes = []
+
+        filter_batch = 256
+        for start in range(0, total_negative, filter_batch):
+            if self.should_stop:
+                print(f"Topic analysis stopped during filtering at {start} reviews.")
+                break
+
+            end = min(total_negative, start + filter_batch)
+            for i in range(start, end):
+                text = raw_reviews[i]
+                if is_valid_review(text):
+                    reviews.append(text)
+                    dates.append(raw_dates[i])
+                    versions.append(raw_versions[i])
+                    upvotes.append(raw_upvotes[i])
+
+            self.progress["processed"] = end
+            self.progress["eta_seconds"] = self._update_eta(
+                self.progress["processed"],
+                total_negative,
+                self.progress["start_time"],
+            )
+            self.progress["status"] = f"Filtering reviews... {end}/{total_negative}"
 
         total_valid = len(reviews)
         if total_valid == 0:
+            # If the user hit Stop, do not wipe any previously generated cache files.
+            if stop_requested_at_start or self.should_stop:
+                self.progress["status"] = "stopped"
+                return
+
             self._write_empty_outputs()
             self.progress["status"] = "idle"
             return
 
+        # If stop was requested (either before we started, or during filtering),
+        # compute a small partial cache so "Top Issues" can still show something.
+        if stop_requested_at_start or self.should_stop:
+            partial_limit = min(total_valid, 512)
+            reviews = reviews[:partial_limit]
+            dates = dates[:partial_limit]
+            versions = versions[:partial_limit]
+            upvotes = upvotes[:partial_limit]
+            total_valid = len(reviews)
+            # Clear the stop flag so we can run this limited analysis loop.
+            self.should_stop = False
+
+        self.progress["status"] = "analyzing"
         self.progress["total"] = total_valid
+        self.progress["processed"] = 0
+        self.progress["start_time"] = time.time()
 
         topic_stats = {}
         review_classifications = []
@@ -307,11 +341,25 @@ class MLService:
                 "sample_reviews": sample_reviews,
             })
 
+        stopped_midway = self.should_stop
+        stop_requested = stop_requested_at_start or stopped_midway
+
+        # If we were stopped before producing any results, keep previous caches intact.
+        if not topic_rows and not review_classifications and stop_requested:
+            self.progress["status"] = "stopped"
+            return
+
         pd.DataFrame(topic_rows).to_csv(os.path.join(TESTING_PROCESSED_DIR, "topic_analysis.csv"), index=False)
         pd.DataFrame(review_classifications).to_csv(os.path.join(TESTING_PROCESSED_DIR, "review_classifications.csv"), index=False)
 
-        self.progress["status"] = "complete"
-        print(f"Successfully generated topic analysis for {len(review_classifications)} negative reviews.")
+        if stop_requested:
+            self.progress["status"] = "stopped"
+            print(
+                f"Stopped early; generated partial topic analysis for {len(review_classifications)} negative reviews."
+            )
+        else:
+            self.progress["status"] = "complete"
+            print(f"Successfully generated topic analysis for {len(review_classifications)} negative reviews.")
 
     def _extract_months(self, df):
         date_col = "at" if "at" in df.columns else "date" if "date" in df.columns else None

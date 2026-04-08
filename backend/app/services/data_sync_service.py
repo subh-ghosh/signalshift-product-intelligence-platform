@@ -14,18 +14,34 @@ class DataSyncService:
         self.dataset_id = "ashishkumarak/netflix-reviews-playstore-daily-updated"
         self.filename = "netflix_reviews.csv"
         self.sync_meta_path = "data/testing/sync_metadata.json"
+        self._kaggle_init_error = None
         
         # Ensure directories exist
         os.makedirs(self.data_dir, exist_ok=True)
         os.makedirs("data/testing/processed", exist_ok=True)
         
         self.api = None
-        if KaggleApi:
+        if not KaggleApi:
+            self._kaggle_init_error = (
+                "Kaggle client library is not installed. Install it with `pip install kaggle` "
+                "(or `pip install -r backend/requirements.txt`)."
+            )
+        else:
             try:
                 self.api = KaggleApi()
                 self.api.authenticate()
             except Exception as e:
-                print(f"Kaggle Authentication failed: {e}")
+                self.api = None
+                self._kaggle_init_error = (
+                    "Kaggle API authentication failed. Ensure Kaggle credentials are configured. "
+                    "Common setup: create `~/.kaggle/kaggle.json` with your API token and run `chmod 600 ~/.kaggle/kaggle.json`, "
+                    "or set env vars `KAGGLE_USERNAME` and `KAGGLE_KEY`. "
+                    f"Underlying error: {e}"
+                )
+
+    def get_kaggle_ready_error(self):
+        """Return a human-friendly error if Kaggle sync can't run, else None."""
+        return self._kaggle_init_error
 
     def get_sync_status(self):
         """Returns the last sync date and current state"""
@@ -58,7 +74,7 @@ class DataSyncService:
         """Downloads the latest CSV from Kaggle with granular progress tracking"""
         import threading
         if not self.api:
-            raise Exception("Kaggle API not initialized. Check credentials.")
+            raise Exception(self._kaggle_init_error or "Kaggle API not initialized.")
             
         print(f"Starting Kaggle sync for {self.dataset_id}...")
         
@@ -69,7 +85,12 @@ class DataSyncService:
                 files = self.api.dataset_list_files(self.dataset_id).files
                 for f in files:
                     if f.name == self.filename or f.name == self.filename + ".zip":
-                        total_size = f.totalBytes
+                        total_size = (
+                            getattr(f, "totalBytes", None)
+                            or getattr(f, "total_bytes", None)
+                            or getattr(f, "size", None)
+                            or total_size
+                        )
                         break
             except Exception as e:
                 print(f"Metadata fetch failed (using fallback size): {e}")
