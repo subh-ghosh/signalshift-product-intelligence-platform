@@ -15,5 +15,8 @@ backend/data/testing/raw/
 backend/data/testing/sync_metadata.json
 
 # Training datasets (raw + processed)
-backend/data/training/raw/
 backend/data/training/processed/
+backend/data/training/raw/*
+
+# Allowlist: keep one training file tracked in git
+!backend/data/training/raw/all_combined.csv
