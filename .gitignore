@@ -1,6 +1,8 @@
 *.pyc
 __pycache__/
 *.log
+paper/*.aux
+paper/*.out
 /.venv/
 backend/venv/
 frontend/node_modules/
