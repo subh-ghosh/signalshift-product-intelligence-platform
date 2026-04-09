@@ -3,4 +3,40 @@ __pycache__/
 *.log
 /.venv/
 backend/venv/
+backend/.venv/
 frontend/node_modules/
+
+# Editor/agent artifacts
+.codex
+
+# Local exports / one-off artifacts
+rev.json
+sev.json
+
+# Paper build outputs (keep sources elsewhere as needed)
+paper/*.aux
+paper/*.out
+paper/*.log
+
+# Generated backend outputs
+backend/out.txt
+backend/test_out*.txt
+backend/test.pdf
+
+# Sync downloads + processed outputs
+backend/data/sync_metadata.json
+backend/data/processed/
+backend/data/raw/
+backend/data/reports/
+
+# Testing cache datasets
+backend/data/testing/raw/
+backend/data/testing/processed/
+backend/data/testing/sync_metadata.json
+
+# Training datasets (raw + processed)
+backend/data/training/processed/
+backend/data/training/raw/*
+
+# Allowlist (optional): keep one training file tracked in git
+!backend/data/training/raw/all_combined.csv
