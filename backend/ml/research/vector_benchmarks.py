@@ -10,7 +10,7 @@ import os
 
 # Robust path detection
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Should be in backend/app/ml, so go up to backend
+# Should be in backend/ml/research, so go up to backend
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR)))
 # Or just hardcode the absolute path for this specific environment to be safe
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

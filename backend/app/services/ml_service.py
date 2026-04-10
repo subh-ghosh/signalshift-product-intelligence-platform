@@ -8,10 +8,10 @@ from collections import Counter
 
 from sentence_transformers import SentenceTransformer
 
-from app.ml.text_cleaner import clean_text
-from app.ml.spam_filter import is_valid_review
+from ml.core.text_cleaner import clean_text
+from ml.core.spam_filter import is_valid_review
 from .alerting_service import AlertingService
-from app.ml.issue_labeler import generate_issue_label
+from ml.core.issue_labeler import generate_issue_label
 from .paths import models_dir, processed_data_dir
 
 
@@ -328,11 +328,11 @@ class MLService:
 
         # ── PHASE 24 SETUP: Pre-build taxonomy category embeddings ────────────
         # We import here to reuse the singleton that's already cached
-        from app.ml.issue_labeler import (
+        from ml.core.issue_labeler import (
             _build_taxonomy_embeddings, _taxonomy_embeddings, _taxonomy_labels,
             ISSUE_TAXONOMY, _encoder as _il_encoder
         )
-        import app.ml.issue_labeler as il_module
+        import ml.core.issue_labeler as il_module
         # Inject the already-loaded encoder so we don't load it twice
         il_module._encoder = self.encoder
         _build_taxonomy_embeddings()

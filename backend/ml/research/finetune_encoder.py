@@ -114,7 +114,7 @@ model.fit(
 
 # ─── Evaluate on Held-Out Set ─────────────────────────────────────────────────
 print("[5/5] Evaluating alignment on canonical taxonomy categories...")
-from app.ml.issue_labeler import ISSUE_TAXONOMY
+from ml.core.issue_labeler import ISSUE_TAXONOMY
 import numpy as np
 
 # Encode all category descriptions with the new model
