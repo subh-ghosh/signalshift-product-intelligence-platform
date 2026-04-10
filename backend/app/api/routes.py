@@ -11,9 +11,16 @@ from app.services.data_sync_service import DataSyncService
 from app.services.report_service import ReportService
 from app.services.alerting_service import AlertingService
 from app.services.ai_summary_service import ai_summary_service
+from app.services.paths import processed_data_dir
 from fastapi.responses import FileResponse
 
 router = APIRouter()
+
+PROCESSED_DIR = processed_data_dir()
+
+
+def processed_file(filename: str) -> str:
+    return os.path.join(PROCESSED_DIR, filename)
 
 ml_service = None
 sync_service = DataSyncService()
@@ -101,8 +108,8 @@ def detect_issues(request: BatchReviewRequest):
 # -----------------------------
 
 def get_dashboard_dataset():
-    uploaded = "data/processed/uploaded_reviews.csv"
-    cleaned = "data/processed/cleaned_reviews.csv"
+    uploaded = processed_file("uploaded_reviews.csv")
+    cleaned = processed_file("cleaned_reviews.csv")
     try:
         if os.path.exists(uploaded):
             return pd.read_csv(uploaded)
@@ -173,7 +180,7 @@ def sentiment_distribution(limit_months: int = 0):
 @router.get("/dashboard/top-issues")
 def top_issues(limit_months: int = 0):
     try:
-        topic_df = pd.read_csv("data/processed/topic_analysis.csv")
+        topic_df = pd.read_csv(processed_file("topic_analysis.csv"))
 
         # Detect the label column
         if "label" in topic_df.columns:
@@ -189,7 +196,7 @@ def top_issues(limit_months: int = 0):
 
         if limit_months > 0:
             try:
-                ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+                ts_df = pd.read_csv(processed_file("topic_timeseries.csv"))
                 all_months = sorted(ts_df["month"].unique())
                 curr_months = all_months[-limit_months:]
                 prev_months = all_months[-(limit_months * 2):-limit_months] if len(all_months) >= limit_months * 2 else []
@@ -240,7 +247,7 @@ def top_issues(limit_months: int = 0):
         else:
             # Phase 62: Global Revenue Risk fallback for "All Time"
             try:
-                ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+                ts_df = pd.read_csv(processed_file("topic_timeseries.csv"))
                 # Group by label and sum the revenue risk score across all time
                 global_risk = ts_df.groupby("issue_label")["revenue_risk_score"].sum()
                 global_risk_df = global_risk.reset_index()
@@ -311,8 +318,8 @@ def top_aspects(limit_months: int = 3):
     Synthesizes semantic mapping, sentiment intensity, and MoM momentum.
     """
     try:
-        ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
-        topic_analysis = pd.read_csv("data/processed/topic_analysis.csv")
+        ts_df = pd.read_csv(processed_file("topic_timeseries.csv"))
+        topic_analysis = pd.read_csv(processed_file("topic_analysis.csv"))
         all_months = sorted(ts_df["month"].unique())
         
         # 1. Topic-to-Aspect Mapping
@@ -396,7 +403,7 @@ async def get_ai_summary(limit_months: int = 0):
 def get_topic_benchmark():
     """Returns the qualitative shift in intelligence after our core model upgrade."""
     try:
-        df = pd.read_csv("data/processed/topic_evolution_summary.csv")
+        df = pd.read_csv(processed_file("topic_evolution_summary.csv"))
         return df.to_dict(orient="records")
     except FileNotFoundError:
         return []
@@ -419,7 +426,7 @@ def trending_issues(limit_months: int = 0, metric: str = "severity"):
     Backwards-compatible: works with old CSV (raw mentions only).
     """
     try:
-        df = pd.read_csv("data/processed/topic_timeseries.csv")
+        df = pd.read_csv(processed_file("topic_timeseries.csv"))
         df = df.sort_values(by="month")
 
         # ── 1. Pick best available metric column ────────────────────────────
@@ -639,7 +646,7 @@ def issue_reviews(issue: str, limit_months: int = 0):
     """
     import ast
 
-    CLF_PATH = "data/processed/review_classifications.csv"
+    CLF_PATH = processed_file("review_classifications.csv")
 
     # ── Primary: time-aware review_classifications.csv ──────────────────────
     if os.path.exists(CLF_PATH):
@@ -694,7 +701,7 @@ def issue_reviews(issue: str, limit_months: int = 0):
 
     # ── Fallback: pre-stored sample_reviews in topic_analysis.csv ───────────
     try:
-        topic_df = pd.read_csv("data/processed/topic_analysis.csv")
+        topic_df = pd.read_csv(processed_file("topic_analysis.csv"))
         matching_reviews = []
         matched_label = issue
         for _, row in topic_df.iterrows():
@@ -776,7 +783,7 @@ def velocity_alerts(limit_months: int = 3):
     DROP_CRITICAL  = -40  # > 40% drop     → good news, silent
     alerts_out = []
     try:
-        ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+        ts_df = pd.read_csv(processed_file("topic_timeseries.csv"))
         all_months = sorted(ts_df["month"].unique())
         if len(all_months) < limit_months:
             return []
@@ -834,7 +841,7 @@ def get_intelligence_alerts(limit_months: int = 3):
     into a single high-priority stream.
     """
     try:
-        ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+        ts_df = pd.read_csv(processed_file("topic_timeseries.csv"))
         all_months = sorted(ts_df["month"].unique())
         if len(all_months) < 2:
             return {"alerts": []}
@@ -869,7 +876,7 @@ def get_intelligence_alerts(limit_months: int = 3):
         
         # 4. Aspect Dominance Sensor (Legacy Sensor Unification)
         try:
-            aspect_df = pd.read_csv("data/processed/aspect_analysis.csv")
+            aspect_df = pd.read_csv(processed_file("aspect_analysis.csv"))
             total_aspect_mentions = aspect_df["mentions"].sum()
             if total_aspect_mentions > 0:
                 for _, row in aspect_df.iterrows():
@@ -992,7 +999,7 @@ def dashboard_kpis(limit_months: int = 0):
         # Active issues from timeseries
         active_issues, prev_active = 0, None
         try:
-            ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
+            ts_df = pd.read_csv(processed_file("topic_timeseries.csv"))
             all_months = sorted(ts_df["month"].unique())
             if limit_months > 0:
                 curr_months = all_months[-limit_months:]
@@ -1033,8 +1040,8 @@ def dashboard_kpis(limit_months: int = 0):
 def get_sentiment_stability(limit_months: int = 0):
     """Calculates app-wide sentiment stability using Bollinger bands."""
     try:
-        ts_df = pd.read_csv("data/processed/topic_timeseries.csv")
-        topic_analysis = pd.read_csv("data/processed/topic_analysis.csv")
+        ts_df = pd.read_csv(processed_file("topic_timeseries.csv"))
+        topic_analysis = pd.read_csv(processed_file("topic_analysis.csv"))
         
         # Get severity mapping
         severity_map = topic_analysis.set_index("label")["avg_severity"].to_dict()
@@ -1134,7 +1141,7 @@ def get_diagnostic_evidence(aspect: str = None, month: str = None, topic: str = 
     """Returns grounded evidence reviews for a specific cross-section."""
     try:
         # Phase 62: Try to use enriched dataset first to enable rich badges/weights
-        CLF_PATH = "data/processed/review_classifications.csv"
+        CLF_PATH = processed_file("review_classifications.csv")
         if os.path.exists(CLF_PATH):
             df = pd.read_csv(CLF_PATH)
             # Filter logic (search strings)
@@ -1189,7 +1196,7 @@ def get_diagnostic_evidence(aspect: str = None, month: str = None, topic: str = 
 def emerging_issues_endpoint(limit_months: int = 0):
     """Returns flagged emerging issue clusters."""
     try:
-        df = pd.read_csv("data/processed/emerging_issues.csv")
+        df = pd.read_csv(processed_file("emerging_issues.csv"))
         flagged = df[df["is_flagged"] == True].copy()
 
         # Sort by volume descending
@@ -1223,7 +1230,7 @@ def emerging_issues_endpoint(limit_months: int = 0):
 def semantic_drift_endpoint(limit_months: int = 0):
     """Returns semantically evolving categories (drift > threshold), optionally filtered to recent window."""
     try:
-        df = pd.read_csv("data/processed/semantic_drift.csv")
+        df = pd.read_csv(processed_file("semantic_drift.csv"))
 
         # Filter to selected window if limit_months set
         if limit_months > 0:
@@ -1368,8 +1375,8 @@ def _process_reviews_job(df: pd.DataFrame):
             
         df["cleaned_content"] = df["content"].str.lower()
 
-        os.makedirs("data/processed", exist_ok=True)
-        df.to_csv("data/processed/uploaded_reviews.csv", index=False)
+        os.makedirs(PROCESSED_DIR, exist_ok=True)
+        df.to_csv(processed_file("uploaded_reviews.csv"), index=False)
         
         # Phase 2: Topics/Cache (Always run on what we have, even if Phase 1 was stopped)
         ml_service.generate_topic_analysis_cache(df)

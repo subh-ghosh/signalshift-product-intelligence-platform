@@ -1,4 +1,6 @@
 import os
+
+from .paths import processed_data_dir
 import json
 import time
 from datetime import datetime, date
@@ -17,7 +19,7 @@ class DataSyncService:
         
         # Ensure directories exist
         os.makedirs(self.data_dir, exist_ok=True)
-        os.makedirs("data/processed", exist_ok=True)
+        os.makedirs(processed_data_dir(), exist_ok=True)
         
         self.api = None
         if KaggleApi:

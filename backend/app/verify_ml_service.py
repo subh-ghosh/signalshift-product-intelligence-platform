@@ -2,8 +2,8 @@ import sys
 import os
 
 # Robust path detection
-BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
-sys.path.append(os.path.join(BASE_DIR))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
 
 from app.services.ml_service import MLService
 

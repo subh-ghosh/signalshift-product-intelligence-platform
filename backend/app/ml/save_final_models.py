@@ -6,7 +6,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 
 # Robust path detection
-BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_PATH = os.path.join(BASE_DIR, "data/processed/cleaned_reviews.csv")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 

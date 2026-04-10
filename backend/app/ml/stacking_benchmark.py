@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.metrics import classification_report
 
 # Robust path detection
-BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_PATH = os.path.join(BASE_DIR, "data/processed/cleaned_reviews.csv")
 
 print("Step 13: Stacking Ensemble (The Meta-AI)")

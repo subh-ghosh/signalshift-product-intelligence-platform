@@ -8,7 +8,7 @@ from scipy.sparse import hstack
 import os
 
 # Robust path detection
-BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_PATH = os.path.join(BASE_DIR, "data/processed/cleaned_reviews.csv")
 
 print("Step 5: Advanced Research - Feature Engineering & Class Imbalance")
@@ -22,7 +22,7 @@ df["sentiment_bit"] = df["score"].apply(lambda x: 1 if x >= 4 else 0)
 print("\n[F] Engineering Metadata Features...")
 df["review_length"] = df["content"].str.len()
 df["exclamation_count"] = df["content"].str.count("!")
-df["question_count"] = df["content"].str.count("\?")
+df["question_count"] = df["content"].str.count(r"\?")
 # Scale features (Standard practice)
 df["review_length"] = df["review_length"] / df["review_length"].max()
 df["exclamation_count"] = df["exclamation_count"] / (df["exclamation_count"].max() + 1)

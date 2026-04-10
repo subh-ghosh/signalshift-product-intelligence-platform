@@ -3,8 +3,13 @@ import json
 import pandas as pd
 from datetime import datetime
 
+from .paths import processed_data_dir
+
+
 class AlertingService:
-    def __init__(self, data_dir="data/processed"):
+    def __init__(self, data_dir=None):
+        if data_dir is None:
+            data_dir = processed_data_dir()
         self.data_dir = data_dir
         self.alert_registry = os.path.join(self.data_dir, "alerts.json")
         # Default thresholds

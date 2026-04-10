@@ -1,8 +1,13 @@
 import pandas as pd
 import ast
 
+from .paths import processed_data_dir
+
+
 class AiSummaryService:
-    def __init__(self, data_dir="data/processed"):
+    def __init__(self, data_dir=None):
+        if data_dir is None:
+            data_dir = processed_data_dir()
         self.data_dir = data_dir
 
     def generate_executive_summary(self, limit_months=0) -> str:

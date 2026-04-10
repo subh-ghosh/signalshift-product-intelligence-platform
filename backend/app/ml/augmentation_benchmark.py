@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Robust path detection
-BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_PATH = os.path.join(BASE_DIR, "data/processed/cleaned_reviews.csv")
 
 print("Step 11: Data Augmentation (Oversampling for Balance)")

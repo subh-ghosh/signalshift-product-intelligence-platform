@@ -11,7 +11,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 def run_bertopic_benchmark():
     print("--- ARCHITECTURE EVOLUTION BENCHMARK (NMF vs BERTopic) ---\n")
     
-    BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
     # 1. Load Data
     print("Loading recent dataset...")

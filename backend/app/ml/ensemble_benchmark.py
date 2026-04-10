@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.metrics import f1_score, accuracy_score
 
 # Robust path detection
-BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_PATH = os.path.join(BASE_DIR, "data/processed/cleaned_reviews.csv")
 
 print("Step 7: Ensemble Modeling (Voter System)")

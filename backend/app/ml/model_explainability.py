@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Robust path detection
-BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODEL_PATH = os.path.join(BASE_DIR, "models/sentiment_model_v2.joblib")
 VEC_PATH = os.path.join(BASE_DIR, "models/tfidf_vectorizer_v2.joblib")
 

@@ -13,7 +13,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Should be in backend/app/ml, so go up to backend
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR)))
 # Or just hardcode the absolute path for this specific environment to be safe
-BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DATA_PATH = os.path.join(BASE_DIR, "data/processed/cleaned_reviews.csv")
 OUTPUT_PATH = os.path.join(BASE_DIR, "data/processed/vector_benchmark.csv")

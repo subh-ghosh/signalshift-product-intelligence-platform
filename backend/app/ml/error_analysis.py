@@ -8,7 +8,7 @@ from sklearn.metrics import confusion_matrix, classification_report
 import numpy as np
 
 # Robust path detection
-BASE_DIR = "/media/subh/Shared Storage/signalshift/backend"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_PATH = os.path.join(BASE_DIR, "data/processed/cleaned_reviews.csv")
 
 print("Step 12: Systematic Error Analysis (Under the Hood)")

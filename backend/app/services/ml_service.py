@@ -4,6 +4,7 @@ import time
 import os
 import numpy as np
 import heapq
+from collections import Counter
 
 from sentence_transformers import SentenceTransformer
 
@@ -11,6 +12,7 @@ from app.ml.text_cleaner import clean_text
 from app.ml.spam_filter import is_valid_review
 from .alerting_service import AlertingService
 from app.ml.issue_labeler import generate_issue_label
+from .paths import models_dir, processed_data_dir
 
 
 class MLService:
@@ -48,9 +50,7 @@ class MLService:
 
         print("Loading ML models...")
 
-        # Robust path detection
-        BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        MODEL_DIR = os.path.join(BASE_DIR, "models")
+        MODEL_DIR = models_dir()
 
         # sentiment model v2 (Bi-gram optimized)
         self.sentiment_model = joblib.load(os.path.join(MODEL_DIR, "sentiment_model_v2.joblib"))
@@ -175,12 +175,11 @@ class MLService:
     def predict_topic(self, review):
 
         cleaned = clean_text(review)
-        
-        # Use LDA instead of embeddings
-        counts = self.count_vectorizer.transform([cleaned])
-        topic_probs = self.lda_model.transform(counts)[0]
-        
-        best_index = int(np.argmax(topic_probs))
+
+        # Use the loaded NMF topic model + vectorizer
+        X = self.nmf_vectorizer.transform([cleaned])
+        topic_weights = self.nmf_model.transform(X)[0]
+        best_index = int(np.argmax(topic_weights))
         keywords = self.topic_keywords[best_index]
 
         return {
@@ -280,7 +279,9 @@ class MLService:
         self.progress["start_time"] = time.time()
             
         if total_negative == 0:
-            pd.DataFrame(columns=['topic_id', 'keywords', 'mentions', 'sample_reviews']).to_csv("data/processed/topic_analysis.csv", index=False)
+            out_path = os.path.join(processed_data_dir(), "topic_analysis.csv")
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            pd.DataFrame(columns=['topic_id', 'keywords', 'mentions', 'sample_reviews']).to_csv(out_path, index=False)
             self.progress["status"] = "idle"
             return
             
@@ -313,7 +314,9 @@ class MLService:
         self.progress["total"] = total_valid
         
         if total_valid == 0:
-            pd.DataFrame(columns=['topic_id', 'keywords', 'mentions', 'sample_reviews']).to_csv("data/processed/topic_analysis.csv", index=False)
+            out_path = os.path.join(processed_data_dir(), "topic_analysis.csv")
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            pd.DataFrame(columns=['topic_id', 'keywords', 'mentions', 'sample_reviews']).to_csv(out_path, index=False)
             self.progress["status"] = "idle"
             return
             
@@ -612,12 +615,16 @@ class MLService:
 
         # Export core topic clusters
         cache_df = pd.DataFrame(results).sort_values(by="mentions", ascending=False)
-        cache_df.to_csv("data/processed/topic_analysis.csv", index=False)
+        out_topic = os.path.join(processed_data_dir(), "topic_analysis.csv")
+        os.makedirs(os.path.dirname(out_topic), exist_ok=True)
+        cache_df.to_csv(out_topic, index=False)
 
         # ── PHASE 31: Save per-review classifications for time-aware evidence ─
         if review_classifications:
             clf_df = pd.DataFrame(review_classifications)
-            clf_df.to_csv("data/processed/review_classifications.csv", index=False)
+            out_clf = os.path.join(processed_data_dir(), "review_classifications.csv")
+            os.makedirs(os.path.dirname(out_clf), exist_ok=True)
+            clf_df.to_csv(out_clf, index=False)
             print(f"[Phase 31] Saved {len(clf_df):,} per-review classifications to review_classifications.csv")
 
         # ── PHASE 27: ANOMALY / EMERGING ISSUE DETECTION ─────────────────────
@@ -713,7 +720,9 @@ class MLService:
 
                     if emerging_rows:
                         em_df = pd.DataFrame(emerging_rows).sort_values("estimated_volume", ascending=False)
-                        em_df.to_csv("data/processed/emerging_issues.csv", index=False)
+                        out_emerging = os.path.join(processed_data_dir(), "emerging_issues.csv")
+                        os.makedirs(os.path.dirname(out_emerging), exist_ok=True)
+                        em_df.to_csv(out_emerging, index=False)
                         flagged = sum(1 for r in emerging_rows if r["is_flagged"])
                         print(f"[Phase 27] {len(emerging_rows)} potential emerging issues found, {flagged} flagged (volume ≥ 40).")
                     else:
@@ -758,7 +767,9 @@ class MLService:
                     "threshold_confidence": 0.30,
                     "dedup_threshold": 0.85
                 }])
-                quality_df.to_csv("data/processed/classification_quality.csv", index=False)
+                out_quality = os.path.join(processed_data_dir(), "classification_quality.csv")
+                os.makedirs(os.path.dirname(out_quality), exist_ok=True)
+                quality_df.to_csv(out_quality, index=False)
                 print(f"[Phase 25.1] Silhouette Score: {sil_score:.4f} across {len(unique_labels)} categories")
             else:
                 print("[Phase 25.1] Not enough categories for silhouette scoring.")
@@ -828,7 +839,9 @@ class MLService:
             print(f"[Phase 25.2] Drift detection failed: {e}")
 
         if drift_rows:
-            pd.DataFrame(drift_rows).to_csv("data/processed/semantic_drift.csv", index=False)
+            out_drift = os.path.join(processed_data_dir(), "semantic_drift.csv")
+            os.makedirs(os.path.dirname(out_drift), exist_ok=True)
+            pd.DataFrame(drift_rows).to_csv(out_drift, index=False)
         # ─────────────────────────────────────────────────────────────────────
 
         # ── Phase 53: Export NORMALIZED + REVENUE-WEIGHTED time-series ──
@@ -873,11 +886,15 @@ class MLService:
         # ─────────────────────────────────────────────────────────────────────
 
         if timeseries_data:
-            pd.DataFrame(timeseries_data).to_csv("data/processed/topic_timeseries.csv", index=False)
+            out_timeseries = os.path.join(processed_data_dir(), "topic_timeseries.csv")
+            os.makedirs(os.path.dirname(out_timeseries), exist_ok=True)
+            pd.DataFrame(timeseries_data).to_csv(out_timeseries, index=False)
         
         # Save Aspect Stats for Dashboard Heatmap
         aspect_rows = [{"aspect": k, "mentions": v} for k, v in aspect_stats.items()]
-        pd.DataFrame(aspect_rows).to_csv("data/processed/aspect_analysis.csv", index=False)
+        out_aspects = os.path.join(processed_data_dir(), "aspect_analysis.csv")
+        os.makedirs(os.path.dirname(out_aspects), exist_ok=True)
+        pd.DataFrame(aspect_rows).to_csv(out_aspects, index=False)
 
         # Trigger Threshold Check
         print("[!] Checking critical thresholds...")

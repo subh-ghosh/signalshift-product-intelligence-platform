@@ -9,8 +9,13 @@ from fpdf import FPDF
 from app.services.ai_summary_service import ai_summary_service
 
 
+from .paths import processed_data_dir
+
+
 class ReportService:
-    def __init__(self, data_dir="data/processed"):
+    def __init__(self, data_dir=None):
+        if data_dir is None:
+            data_dir = processed_data_dir()
         self.data_dir = data_dir
         self.output_dir = "data/reports"
         os.makedirs(self.output_dir, exist_ok=True)

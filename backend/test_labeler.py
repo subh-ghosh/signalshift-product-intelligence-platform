@@ -1,6 +1,8 @@
 import pandas as pd
 import os
 
+from app.services.paths import processed_data_dir
+
 # Define the problematic generic words to ignore in labels
 # These are words often found in clusters but provide zero value for a title
 STOP_LABELS = {
@@ -28,7 +30,7 @@ def improved_labeler(keywords_str):
     return f"{words[0].capitalize()} System Feedback"
 
 # Test on actual data
-DATA_PATH = "/media/subh/Shared Storage/signalshift/backend/data/processed/topic_analysis.csv"
+DATA_PATH = os.path.join(processed_data_dir(), "topic_analysis.csv")
 if os.path.exists(DATA_PATH):
     df = pd.read_csv(DATA_PATH)
     print("Testing Improved Labeler on existing topics:\n")
