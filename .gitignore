@@ -23,20 +23,23 @@ backend/out.txt
 backend/test_out*.txt
 backend/test.pdf
 
-# Sync downloads + processed outputs
-backend/data/sync_metadata.json
-backend/data/processed/
-backend/data/raw/
-backend/data/reports/
-
-# Testing cache datasets
+# Runtime datasets (required layout: backend/data/{training,testing}/{raw,processed})
+# Testing datasets are generated locally.
 backend/data/testing/raw/
 backend/data/testing/processed/
-backend/data/testing/sync_metadata.json
 
 # Training datasets (raw + processed)
 backend/data/training/processed/
 backend/data/training/raw/*
 
-# Allowlist (optional): keep one training file tracked in git
-!backend/data/training/raw/all_combined.csv
+# Keep directory skeletons tracked (must be after the training/raw ignore rule)
+!backend/data/**/.gitkeep
+!backend/data/training/raw/.gitkeep
+!backend/data/training/processed/.gitkeep
+
+# Model artifacts
+# Track joblib artifacts so the app works out-of-the-box.
+backend/models/*.pkl
+backend/models/*.bin
+backend/models/*.onnx
+!backend/models/.gitkeep

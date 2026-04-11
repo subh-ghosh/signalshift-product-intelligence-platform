@@ -1,26 +1,27 @@
 # SignalShift Platform
 
-SignalShift is a production-grade Product Intelligence system for transforming unstructured customer feedback into prioritized, actionable insights. This repository captures the core architecture, teams, and tooling needed to deliver the 2026-standard platform described in the Product & Engineering Master Document.
+SignalShift is a Product Intelligence prototype for transforming unstructured customer feedback into actionable insights (sentiment, topics, and issue labels) with a dashboard.
 
 ## Overview
 - **Problem:** Large volumes of feedback (reviews, tickets, surveys) are currently analyzed manually, causing slow detection of regressions, poor prioritization, and missing executive summaries.
-- **Solution:** A multi-tenant SaaS that ingests feedback, applies NLP + analytics, scores impact, detects anomalies, and shares insights via dashboards and alerts.
-- **Primary Stack:** Next.js 14 + TypeScript (frontend), FastAPI (backend), PostgreSQL, Redis, Dockerized services, and ML + pipeline tooling (Hugging Face, scikit-learn, BERTopic, Kafka in Phase 2).
+- **Solution:** Ingest reviews, run ML analysis, and visualize KPIs + top issues.
+- **Primary Stack (in this repo):** FastAPI (backend) + React (Vite) (frontend) + scikit-learn / SentenceTransformers / spaCy (ML).
 
 ## Repository Layout
-- `backend/` – FastAPI service structured around API, services, models, and analytics helpers.
-- `frontend/` – Next.js 14 workspace with layouts, shared components, and data layer to consume the backend APIs.
-- `docs/` – Architecture, deployment, and onboarding docs keyed to the 2026 standard.
-- `infra/` – IaC helpers (Docker, Terraform templates, pipeline configs) to align with production expectations.
-- `data/` – Data pipeline code, preprocessing scripts, and sample schema definitions for ingestion, NLP, and scoring.
-- `observability/` – Shared logging, metrics, tracing, and alerting config.
-- `config/` – Environment templates, secrets vault reference, and rate-limiting/tenant isolation policy files.
+- `backend/` – FastAPI API (`backend/app`) plus ML runtime + training scripts (`backend/ml`).
+- `frontend/` – React + Vite dashboard.
+- `research_docs/` – Research and benchmarking writeups.
 
 ## Getting Started
-1. Read `docs/architecture.md` for the system blueprint and component responsibilities.
-2. Install backend dependencies via `pip install -r backend/requirements.txt` (or `poetry install`) and initialize the database for the relevant tenant.
-3. Spin up the frontend with `pnpm install && pnpm dev` from `frontend/`.
-4. Use `infra/docker-compose.dev.yml` to run Redis, PostgreSQL, and other services locally mirroring the production stack.
+1. Backend:
+	- `pip install -r backend/requirements.txt`
+	- `python -m spacy download en_core_web_sm`
+	- `cd backend && uvicorn app.main:app --reload --port 8002`
+2. Frontend:
+	- `cd frontend && npm install`
+	- `npm run dev`
+
+The frontend talks to the backend at `VITE_API_URL` (defaults to `http://127.0.0.1:8002`).
 
 ## Contributing
-Adhere to the engineering principles outlined in `docs/engineering-principles.md`: multi-tenant isolation, async-first, event-driven, scalable, structured logging, and idempotent ingestion. Every feature should have a matching test or contract and documentation that explains usage and failure handling.
+Keep changes minimal and consistent with the DS-style layout conventions (canonical ML pipeline scripts under `backend/ml/pipeline`).

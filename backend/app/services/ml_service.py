@@ -18,6 +18,7 @@ from .paths import models_dir, processed_data_dir
 class MLService:
     def semantic_search(self, query: str, reviews: list[str], top_n: int = 15):
         """Perform semantic search across a list of reviews using the internal encoder."""
+        self._require_ready()
         if not reviews:
             return []
             
@@ -48,55 +49,76 @@ class MLService:
 
     def __init__(self):
 
-        print("Loading ML models...")
+        # If artifacts are missing (e.g. you deleted backend/models to retrain cleanly),
+        # we keep the API bootable and expose a clear error at call time.
+        self.ready = False
+        self.init_error = None
 
-        MODEL_DIR = models_dir()
-
-        # sentiment model v2 (Bi-gram optimized)
-        self.sentiment_model = joblib.load(os.path.join(MODEL_DIR, "sentiment_model_v2.joblib"))
-
-        # tfidf vectorizer v2
-        self.vectorizer = joblib.load(os.path.join(MODEL_DIR, "tfidf_vectorizer_v2.joblib"))
-
-        print("Loading topic model (NMF Precision Upgrade)...")
-
-        self.nmf_model = joblib.load(os.path.join(MODEL_DIR, "nmf_model.joblib"))
-        self.nmf_vectorizer = joblib.load(os.path.join(MODEL_DIR, "nmf_vectorizer.joblib"))
-
-        # Pre-extract keywords for each NMF topic
+        self.sentiment_model = None
+        self.vectorizer = None
+        self.nmf_model = None
+        self.nmf_vectorizer = None
         self.topic_keywords = []
-        feature_names = self.nmf_vectorizer.get_feature_names_out()
-        for topic_idx, topic in enumerate(self.nmf_model.components_):
-            top_words = [feature_names[i] for i in topic.argsort()[:-6:-1]]
-            self.topic_keywords.append(", ".join(top_words))
-        
+        self.encoder = None
+
         # Progress tracking for large uploads
         self.progress = {
-            "processed": 0, 
-            "total": 0, 
+            "processed": 0,
+            "total": 0,
             "status": "idle",
             "eta_seconds": 0,
-            "start_time": None
+            "start_time": None,
         }
         self.should_stop = False
 
         # Aspect-Based Sentiment Analysis (ABSA) Logic
-        # These categories allow B2B customers to see WHY people are unhappy
         self.aspect_config = {
             "Performance/Technical": ["crash", "lag", "buffer", "freeze", "slow", "loading", "error", "bug"],
             "Content/Library": ["movie", "show", "series", "selection", "episodes", "watch", "boring"],
             "UI/UX Experience": ["interface", "design", "navigation", "button", "screen", "search", "easy"],
             "Pricing/Subscription": ["expensive", "price", "money", "subscription", "plan", "cancel", "worth"],
         }
-        
+
         self.alerting_service = AlertingService()
-        
-        print("Loading SentenceTransformer (Dynamic Alignment Engine)...")
-        # Lightweight but accurate model for semantic similarity reranking
-        # FORCING CPU to avoid CUDA capability sm_61 errors on this machine
-        self.encoder = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
-        
+
+        print("Loading ML models...")
+        model_dir = models_dir()
+
+        try:
+            self.sentiment_model = joblib.load(os.path.join(model_dir, "sentiment_model.joblib"))
+            self.vectorizer = joblib.load(os.path.join(model_dir, "tfidf_vectorizer.joblib"))
+
+            print("Loading topic model (NMF Precision Upgrade)...")
+            self.nmf_model = joblib.load(os.path.join(model_dir, "nmf_model.joblib"))
+            self.nmf_vectorizer = joblib.load(os.path.join(model_dir, "nmf_vectorizer.joblib"))
+
+            # Pre-extract keywords for each NMF topic
+            feature_names = self.nmf_vectorizer.get_feature_names_out()
+            for topic in self.nmf_model.components_:
+                top_words = [feature_names[i] for i in topic.argsort()[:-6:-1]]
+                self.topic_keywords.append(", ".join(top_words))
+
+            print("Loading SentenceTransformer (Dynamic Alignment Engine)...")
+            self.encoder = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+        except Exception as exc:
+            self.init_error = (
+                "ML artifacts are missing or failed to load. Retrain, then restart the backend. "
+                "Expected in backend/models/: sentiment_model.joblib, tfidf_vectorizer.joblib, "
+                "nmf_model.joblib, nmf_vectorizer.joblib. "
+                f"Details: {exc}"
+            )
+            print(self.init_error)
+            return
+
+        self.ready = True
         print("ML models loaded successfully.")
+
+    def is_ready(self) -> bool:
+        return bool(self.ready) and self.init_error is None
+
+    def _require_ready(self) -> None:
+        if not self.is_ready():
+            raise RuntimeError(self.init_error or "MLService is not ready.")
 
     def _update_eta(self, processed, total, start_time):
         """Calculates estimated seconds remaining based on processing speed"""
@@ -121,6 +143,7 @@ class MLService:
     # -------------------------
 
     def predict_sentiment(self, review):
+        self._require_ready()
 
         cleaned = clean_text(review)
 
@@ -132,6 +155,7 @@ class MLService:
 
     def predict_sentiment_batch(self, reviews):
         """Vectorized sentiment prediction for large batches with progress tracking"""
+        self._require_ready()
         self.should_stop = False
         total = len(reviews)
         self.progress["total"] = total
@@ -173,6 +197,7 @@ class MLService:
     # -------------------------
 
     def predict_topic(self, review):
+        self._require_ready()
 
         cleaned = clean_text(review)
 
@@ -207,6 +232,7 @@ class MLService:
     # -------------------------
 
     def analyze_review(self, review):
+        self._require_ready()
 
         sentiment = self.predict_sentiment(review)
         topic_info = self.predict_topic(review)
@@ -225,6 +251,7 @@ class MLService:
     # -------------------------
 
     def detect_issues(self, reviews):
+        self._require_ready()
 
         issue_counter = {}
 
@@ -263,6 +290,7 @@ class MLService:
         using vectorized batch encoding for high performance.
         """
         import pandas as pd
+        self._require_ready()
         self.should_stop = False
         
         self.progress["status"] = "analyzing"

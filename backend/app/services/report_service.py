@@ -17,8 +17,7 @@ class ReportService:
         if data_dir is None:
             data_dir = processed_data_dir()
         self.data_dir = data_dir
-        self.output_dir = "data/reports"
-        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.data_dir, exist_ok=True)
 
         self.palette = {
             "page_bg": (245, 246, 250),
@@ -1114,9 +1113,10 @@ class ReportService:
                 align="C",
             )
 
-            report_path = os.path.join(self.output_dir, f"signalshift_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
-            pdf.output(report_path)
-            return report_path
+            # Return bytes instead of writing to disk (download-only behavior).
+            filename = f"SignalShift_Report_{'Last' + str(limit_months) + 'M' if limit_months > 0 else 'All'}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            pdf_bytes = pdf.output(dest="S").encode("latin-1")
+            return filename, pdf_bytes
         except Exception as e:
             print(f"Error generating PDF: {e}")
             return None

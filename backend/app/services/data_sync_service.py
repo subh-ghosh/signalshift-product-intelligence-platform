@@ -1,6 +1,6 @@
 import os
 
-from .paths import processed_data_dir
+from .paths import processed_data_dir, raw_data_dir
 import json
 import time
 from datetime import datetime, date
@@ -11,11 +11,13 @@ except ImportError:
     KaggleApi = None
 
 class DataSyncService:
-    def __init__(self, data_dir="data/raw"):
+    def __init__(self, data_dir: str | None = None):
+        if data_dir is None:
+            data_dir = raw_data_dir()
         self.data_dir = data_dir
         self.dataset_id = "ashishkumarak/netflix-reviews-playstore-daily-updated"
         self.filename = "netflix_reviews.csv"
-        self.sync_meta_path = "data/sync_metadata.json"
+        self.sync_meta_path = os.path.join(processed_data_dir(), "sync_metadata.json")
         
         # Ensure directories exist
         os.makedirs(self.data_dir, exist_ok=True)
@@ -59,8 +61,16 @@ class DataSyncService:
     def sync_from_kaggle(self, progress_callback=None):
         """Downloads the latest CSV from Kaggle with granular progress tracking"""
         import threading
+        if KaggleApi is None:
+            raise Exception(
+                "Kaggle sync unavailable: python package 'kaggle' is not installed. "
+                "Install it (pip install kaggle) and configure credentials (~/.kaggle/kaggle.json)."
+            )
         if not self.api:
-            raise Exception("Kaggle API not initialized. Check credentials.")
+            raise Exception(
+                "Kaggle API not initialized. Ensure credentials are configured (~/.kaggle/kaggle.json) "
+                "and are valid."
+            )
             
         print(f"Starting Kaggle sync for {self.dataset_id}...")
         

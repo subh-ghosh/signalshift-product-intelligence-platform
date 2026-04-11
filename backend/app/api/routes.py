@@ -12,7 +12,7 @@ from app.services.report_service import ReportService
 from app.services.alerting_service import AlertingService
 from app.services.ai_summary_service import ai_summary_service
 from app.services.paths import processed_data_dir
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 
 router = APIRouter()
 
@@ -30,6 +30,23 @@ alerting_service = AlertingService()
 def set_ml_service(service):
     global ml_service
     ml_service = service
+
+
+def _ml_not_ready_response() -> dict:
+    if ml_service is None:
+        return {"error": "ML service not initialized."}
+    init_error = getattr(ml_service, "init_error", None)
+    return {
+        "error": "ML models are not available. Retrain the models and restart the backend.",
+        "details": init_error,
+    }
+
+
+def _is_ml_ready() -> bool:
+    if ml_service is None:
+        return False
+    is_ready = getattr(ml_service, "is_ready", None)
+    return bool(is_ready()) if callable(is_ready) else True
 
 
 # -----------------------------
@@ -64,8 +81,8 @@ def health():
 
 @router.post("/analyze-review")
 def analyze_review(request: ReviewRequest):
-    if ml_service is None:
-        return {"error": "ML service not initialized. Please upload data first."}
+    if not _is_ml_ready():
+        return _ml_not_ready_response()
     result = ml_service.analyze_review(request.review)
     return result
 
@@ -76,8 +93,8 @@ def analyze_review(request: ReviewRequest):
 
 @router.post("/analyze-batch")
 def analyze_batch(request: BatchReviewRequest):
-    if ml_service is None:
-        return {"error": "ML service not initialized. Please upload data first."}
+    if not _is_ml_ready():
+        return _ml_not_ready_response()
     results = []
     for review in request.reviews:
         result = ml_service.analyze_review(review)
@@ -94,8 +111,8 @@ def analyze_batch(request: BatchReviewRequest):
 
 @router.post("/detect-issues")
 def detect_issues(request: BatchReviewRequest):
-    if ml_service is None:
-        return {"error": "ML service not initialized. Please upload data first."}
+    if not _is_ml_ready():
+        return _ml_not_ready_response()
     issues = ml_service.detect_issues(request.reviews)
     return {
         "total_reviews": len(request.reviews),
@@ -336,7 +353,21 @@ def top_aspects(limit_months: int = 3):
         prev_months = all_months[-(limit_months * 2):-limit_months] if len(all_months) >= limit_months * 2 else all_months[:-limit_months]
         
         # 3. Sentiment intensity (avg_severity from topic_analysis)
-        topic_sev = topic_analysis.set_index("label")["avg_severity"].to_dict()
+        # Historical schemas have used different label columns.
+        label_col = None
+        for candidate in ("label", "issue_label", "keywords"):
+            if candidate in topic_analysis.columns:
+                label_col = candidate
+                break
+
+        if label_col is None:
+            topic_sev = {}
+        else:
+            sev_col = "avg_severity" if "avg_severity" in topic_analysis.columns else None
+            if sev_col is None:
+                topic_sev = {}
+            else:
+                topic_sev = topic_analysis.set_index(label_col)[sev_col].to_dict()
 
         aspect_data = []
         for aspect, labels in mapping.items():
@@ -621,15 +652,15 @@ def trending_issues(limit_months: int = 0, metric: str = "severity"):
 @router.get("/dashboard/export-pdf")
 async def export_report(limit_months: int = 0):
     """Generates and returns a branded PDF executive report for the selected time window."""
-    report_path = report_service.generate_pdf_report(limit_months=limit_months)
-    if not report_path or not os.path.exists(report_path):
+    report_result = report_service.generate_pdf_report(limit_months=limit_months)
+    if not report_result:
         return {"error": "Failed to generate report"}
 
-    window_label = f"Last{limit_months}M" if limit_months > 0 else "All"
-    return FileResponse(
-        path=report_path,
-        filename=f"SignalShift_Report_{window_label}_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf",
-        media_type="application/pdf"
+    filename, pdf_bytes = report_result
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 # -----------------------------
