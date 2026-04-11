@@ -29,12 +29,16 @@ backend/data/testing/raw/*
 backend/data/testing/processed/*
 !backend/data/testing/raw/*.csv
 !backend/data/testing/processed/*.csv
+!backend/data/testing/raw/*.json
+!backend/data/testing/processed/*.json
 
 # Training datasets (raw + processed)
 backend/data/training/processed/*
 backend/data/training/raw/*
 !backend/data/training/raw/*.csv
 !backend/data/training/processed/*.csv
+!backend/data/training/raw/*.json
+!backend/data/training/processed/*.json
 
 # Keep directory skeletons tracked (must be after the training/raw ignore rule)
 !backend/data/**/.gitkeep

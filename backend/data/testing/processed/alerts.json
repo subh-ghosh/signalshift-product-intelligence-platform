@@ -1,0 +1,21 @@
+{
+    "alerts": [
+        {
+            "id": "alert_1775924432_Content/Library",
+            "type": "aspect_spike",
+            "category": "Content/Library",
+            "message": "Critical spike detected in Content/Library (46.5% of complaints).",
+            "severity": "high",
+            "timestamp": "2026-04-11T21:50:32.102702"
+        },
+        {
+            "id": "alert_1775924432_Pricing/Subscription",
+            "type": "aspect_spike",
+            "category": "Pricing/Subscription",
+            "message": "Critical spike detected in Pricing/Subscription (32.2% of complaints).",
+            "severity": "high",
+            "timestamp": "2026-04-11T21:50:32.102819"
+        }
+    ],
+    "last_check": "2026-04-11T21:50:32.102923"
+}
