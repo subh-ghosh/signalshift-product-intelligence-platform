@@ -25,12 +25,16 @@ backend/test.pdf
 
 # Runtime datasets (required layout: backend/data/{training,testing}/{raw,processed})
 # Testing datasets are generated locally.
-backend/data/testing/raw/
-backend/data/testing/processed/
+backend/data/testing/raw/*
+backend/data/testing/processed/*
+!backend/data/testing/raw/*.csv
+!backend/data/testing/processed/*.csv
 
 # Training datasets (raw + processed)
-backend/data/training/processed/
+backend/data/training/processed/*
 backend/data/training/raw/*
+!backend/data/training/raw/*.csv
+!backend/data/training/processed/*.csv
 
 # Keep directory skeletons tracked (must be after the training/raw ignore rule)
 !backend/data/**/.gitkeep
