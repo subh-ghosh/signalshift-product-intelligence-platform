@@ -187,13 +187,17 @@ def generate_issue_label(keywords: str, encoder=None) -> str:
     if not isinstance(keywords, str) or not keywords.strip():
         return "General App Feedback"
 
-    # Build taxonomy embeddings the first time
-    _build_taxonomy_embeddings()
-
-    # Use supplied encoder (from ml_service.encoder) to skip re-loading
-    global _encoder
-    if encoder is not None:
+    # Use supplied encoder (from ml_service.encoder) to skip re-loading.
+    # If encoder instance changes (e.g., base -> fine-tuned), rebuild taxonomy centroids
+    # so query and taxonomy vectors live in the same embedding space.
+    global _encoder, _taxonomy_embeddings, _taxonomy_labels
+    if encoder is not None and _encoder is not encoder:
         _encoder = encoder
+        _taxonomy_embeddings = None
+        _taxonomy_labels = None
+
+    # Build taxonomy embeddings lazily (or rebuild if encoder changed)
+    _build_taxonomy_embeddings()
 
     enc = _get_encoder()
 

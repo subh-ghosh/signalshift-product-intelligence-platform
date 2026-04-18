@@ -36,5 +36,6 @@ The negative words have **much stronger weights** than positive words. This prov
 ---
 
 ## 🚀 Moving to Step 7: The Ensemble Voter
-How do we reach the absolute maximum performance? We use a **Voting Ensemble**. 
-Instead of trusting one model, we will let **Logistic Regression, SVM, and Random Forest** all look at a review and "vote" on the final sentiment.
+Historical next-step hypothesis at that point in the research: use a **Voting Ensemble**.
+Final measured decision (current production): keep the single optimized Logistic Regression
+configuration, because ensemble underperformed on F1 while costing significantly more.

@@ -85,12 +85,14 @@ The SignalShift ML pipeline has been fully evolved through three tiers. Below is
 - Output: `data/processed/emerging_issues.csv`
 
 ### Phase 28 — Few-Shot Fine-Tuning Infrastructure
-#### [REMOVED] finetune_encoder.py
-- Input: `data/labeled/review_labels.csv` (`review`, `category` columns)
+#### [MODIFY] [backend/ml/pipeline/04_finetune_encoder.py](../../../backend/ml/pipeline/04_finetune_encoder.py)
+- Input: `data/training/labeled/review_labels.csv` (`review`, `category` columns)
 - Builds anchor/positive/negative triplets per category
 - Trains with `TripletLoss` for 3 epochs, saves to `models/finetuned_encoder/`
 - Self-evaluates accuracy against labeled set at completion
 - **Prerequisite**: 50+ labeled examples per category
+- If labeled CSV is missing, step 04 auto-generates it from
+	`data/testing/processed/review_classifications.csv` (confidence-filtered)
 
 ---
 
@@ -126,6 +128,6 @@ The SignalShift ML pipeline has been fully evolved through three tiers. Below is
 - `semantic_drift.csv` — monitor `is_evolving = True` categories for root-cause changes
 
 ### When labeled data available
-- Run `python app/ml/finetune_encoder.py`
+- Run `python ml/pipeline/04_finetune_encoder.py`
 - Target accuracy on labeled set: `> 85%` before switching to fine-tuned model
-- Update `ml_service.py` encoder path to `models/finetuned_encoder/`
+- No manual runtime path switch needed (encoder auto-detected at startup)

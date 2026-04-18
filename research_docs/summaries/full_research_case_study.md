@@ -1,6 +1,10 @@
 # Research Case Study: SignalShift Intelligence Upgrade
 **A systematic approach to building high-accuracy, production-ready NLP systems.**
 
+> Status note (current): phases in this case study include historical benchmark tracks.
+> Current production recommendation is the stack documented in "Extension: Phase 22–28"
+> plus the implemented step-04 fine-tuning pipeline.
+
 ## 🎯 Executive Summary
 SignalShift was transformed from a standard review analyzer into a research-grade intelligence system. Through 7 stages of benchmarking on **191,000 Netflix reviews**, we mathematically identified the "Golden Configuration" that maximizes both accuracy and business utility.
 
@@ -54,6 +58,8 @@ We tested if "Big AI" (BERT) could beat our custom-tuned models. **It failed.**
 
 ## 📉 Phase 3: Topic Modeling (Meaning vs. Noise)
 **Winner**: **LDA**
+
+Historical benchmark result prior to the later semantic-routing architecture.
 
 ### 📊 Metric Comparison
 | Model Strategy | Coherence (C_V) | Process Time | Scientific Result |
@@ -192,6 +198,8 @@ We stopped looking at just "numbers" and started reading the actual mistakes.
 ## 🗳️ Phase 13: Stacking Ensembles (The Meta-AI)
 **Outcome**: Adaptive Model selection.
 
+Historical experiment only. Not the current production default.
+
 ### 📊 Stacking Performance
 | Model Level | Algorithm | Contribution |
 | :--- | :--- | :--- |
@@ -201,12 +209,14 @@ We stopped looking at just "numbers" and started reading the actual mistakes.
 
 ### 💡 Why we did this:
 We moved from "Majority Voting" to "Meta-Learning." We trained a boss model to watch the predictions of our other AIs.
-**The Breakthrough**: Stacking achieved a balanced F1-score of **0.86** with very high stability. It proved that while Logistic Regression is the fastest, the Stacking Ensemble is the most "Intelligent" because it understands which of its sub-models to trust based on the review length and content.
+**Historical benchmark finding**: Stacking achieved a balanced F1-score of **0.86** with high stability. Despite this, current production keeps optimized Logistic Regression because it delivered stronger F1 with substantially lower cost.
 
 ---
 
 ## 👑 Phase 14: SignalShiftBERT (Elite Fine-Tuning)
 **Outcome**: Domain-Aware Deep Learning Model.
+
+Historical experiment only. Current production does not use BERT as the default sentiment model.
 
 ### 📊 Transformer Learning Statistics
 | Metric | Configuration | Result |
@@ -259,7 +269,7 @@ After the initial 14-phase research, SignalShift was upgraded through three tier
 |---|---|---|
 | 26 | Severity scoring per review (1.0–5.0 heuristic) | `avg_severity` in `topic_analysis.csv` |
 | 27 | Anomaly / Emerging Issue Detection | `emerging_issues.csv` (flagged at ≥ 40 volume) |
-| 28 | Few-shot fine-tuning infrastructure (triplet loss) | `finetune_encoder.py` — ready for labeled data |
+| 28 | Few-shot fine-tuning infrastructure (triplet loss) | `backend/ml/pipeline/04_finetune_encoder.py` — ready for labeled data |
 
 ### Key Numbers
 | Metric | Value |

@@ -55,7 +55,10 @@ def train_sentiment_pipeline(
         print("Test samples: 0")
 
     print("\nTraining Logistic Regression model...")
-    model = LogisticRegression(max_iter=1000, **(model_kwargs or {}))
+    logistic_kwargs = {"class_weight": "balanced"}
+    if model_kwargs:
+        logistic_kwargs.update(model_kwargs)
+    model = LogisticRegression(max_iter=1000, **logistic_kwargs)
     model.fit(X_train, y_train)
 
     metrics = None

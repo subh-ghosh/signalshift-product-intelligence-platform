@@ -60,6 +60,7 @@ class MLService:
         self.nmf_vectorizer = None
         self.topic_keywords = []
         self.encoder = None
+        self.encoder_source = ""
 
         # Progress tracking for large uploads
         self.progress = {
@@ -99,7 +100,16 @@ class MLService:
                 self.topic_keywords.append(", ".join(top_words))
 
             print("Loading SentenceTransformer (Dynamic Alignment Engine)...")
-            self.encoder = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+            finetuned_dir = os.path.join(model_dir, "finetuned_encoder")
+            if os.path.isdir(finetuned_dir):
+                print(f"Using fine-tuned encoder: {finetuned_dir}")
+                self.encoder = SentenceTransformer(finetuned_dir, device="cpu")
+                self.encoder_source = finetuned_dir
+            else:
+                base_model_name = "all-MiniLM-L6-v2"
+                print(f"Using base encoder: {base_model_name}")
+                self.encoder = SentenceTransformer(base_model_name, device="cpu")
+                self.encoder_source = base_model_name
         except Exception as exc:
             self.init_error = (
                 "ML artifacts are missing or failed to load. Retrain, then restart the backend. "

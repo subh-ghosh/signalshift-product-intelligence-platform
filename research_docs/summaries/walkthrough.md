@@ -1,5 +1,9 @@
 # SignalShift — Full Platform Walkthrough
 
+> Status note (current): Historical benchmark phases are retained for research traceability.
+> Current production stack is LR + bi-gram TF-IDF sentiment, MiniLM semantic routing,
+> NMF for supporting aspect/topic intelligence, and optional step 04 fine-tuning.
+
 Complete record of all features built and DS improvements made.
 
 ---
@@ -30,7 +34,7 @@ Raw Reviews → Spam Filter → NMF (30 components, TF-IDF) → Rule-based Label
 ---
 
 ### Phase 22 — Semantic Zero-Shot Labeling
-**File:** `app/ml/issue_labeler.py` (full rewrite)
+**File:** `backend/ml/core/issue_labeler.py` (full rewrite)
 
 Replaced rule-based `issue_labeler` with **MiniLM zero-shot cosine similarity** against a 12-category universal taxonomy.
 
@@ -92,10 +96,10 @@ silhouette_score, 0.XXXX, 12, N, 0.30, 0.85
 - Output: `data/processed/semantic_drift.csv`
 
 #### 25.3 — Neural Topic Discovery Tool
-- **File:** `app/ml/neural_topic_discovery.py`
+- **File:** archived standalone experiment (not in current production tree)
 - Runs NMF on MiniLM sentence embeddings (not TF-IDF) to discover clusters in semantic space
 - Surfaces unknown emerging issues not covered by taxonomy
-- Run offline: `python app/ml/neural_topic_discovery.py`
+- Historical run command (archived): `python app/ml/neural_topic_discovery.py`
 
 ---
 
@@ -124,7 +128,7 @@ SEVERITY_3_WORDS = {"crash", "bug", "error", "slow", "annoying"}     # +0.5
 ---
 
 ### Phase 28 — Tier 3: Few-Shot Fine-Tuning Script
-**File:** `app/ml/finetune_encoder.py`
+**File:** `backend/ml/pipeline/04_finetune_encoder.py`
 
 Full contrastive training loop using **triplet loss** on labeled review data:
 ```
@@ -138,10 +142,8 @@ Negative = review from different category
 
 **Expected accuracy lift:** ~80% → ~95%+ (once 50+ labeled examples per category collected)
 
-To use the fine-tuned model, update `ml_service.py`:
-```python
-SentenceTransformer('models/finetuned_encoder/', device='cpu')
-```
+Runtime now auto-loads `models/finetuned_encoder/` when present and falls back
+to `all-MiniLM-L6-v2` otherwise.
 
 ---
 
