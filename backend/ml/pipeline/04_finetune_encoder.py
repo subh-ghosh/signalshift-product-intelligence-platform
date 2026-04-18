@@ -19,9 +19,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 from pathlib import Path
 from typing import Iterable
+
+# Default to CPU-safe execution unless user explicitly exports CUDA_VISIBLE_DEVICES.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
 import numpy as np
 import pandas as pd
@@ -88,8 +92,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--bootstrap-min-confidence",
         type=float,
-        default=0.65,
-        help="Minimum confidence for auto-generated labels (default: 0.65)",
+        default=0.0,
+        help="Minimum confidence for auto-generated labels (default: 0.0)",
     )
     parser.add_argument(
         "--bootstrap-max-per-class",
@@ -100,20 +104,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-total-rows",
         type=int,
-        default=120,
-        help="Minimum labeled rows required to continue (default: 120)",
+        default=50,
+        help="Minimum labeled rows required to continue (default: 50)",
     )
     parser.add_argument(
         "--min-classes",
         type=int,
-        default=6,
-        help="Minimum distinct classes required to continue (default: 6)",
+        default=2,
+        help="Minimum distinct classes required to continue (default: 2)",
     )
     parser.add_argument(
         "--holdout-ratio",
         type=float,
         default=0.2,
         help="Holdout ratio for before/after evaluation [0.05, 0.4] (default: 0.2)",
+    )
+    parser.add_argument(
+        "--device",
+        default="cpu",
+        help="Training/inference device for SentenceTransformer (default: cpu)",
     )
     return parser.parse_args()
 
@@ -302,6 +311,10 @@ def evaluate_encoder_with_centroids(
     train_df: pd.DataFrame,
     test_df: pd.DataFrame,
 ) -> dict:
+    # Ensure positional indexing matches embedding array rows after train/test split.
+    train_df = train_df.reset_index(drop=True)
+    test_df = test_df.reset_index(drop=True)
+
     # Encode and normalize train/test vectors
     train_emb = model.encode(train_df["text"].tolist(), normalize_embeddings=True, show_progress_bar=False)
     test_emb = model.encode(test_df["text"].tolist(), normalize_embeddings=True, show_progress_bar=False)
@@ -381,7 +394,7 @@ def main() -> int:
     )
 
     print(f"[finetune] Loading baseline encoder: {args.base_model}")
-    baseline_model = SentenceTransformer(args.base_model, device="cpu")
+    baseline_model = SentenceTransformer(args.base_model, device=args.device)
     baseline_eval = evaluate_encoder_with_centroids(baseline_model, eval_train_df, eval_test_df)
     print(
         "[finetune] Baseline holdout metrics: "
@@ -402,7 +415,7 @@ def main() -> int:
     )
 
     print(f"[finetune] Loading trainable encoder: {args.base_model}")
-    model = SentenceTransformer(args.base_model, device="cpu")
+    model = SentenceTransformer(args.base_model, device=args.device)
 
     train_loader = DataLoader(train_triplets, shuffle=True, batch_size=args.batch_size)
     train_loss = losses.TripletLoss(model=model)

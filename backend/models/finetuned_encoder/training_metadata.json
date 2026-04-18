@@ -1,0 +1,28 @@
+{
+  "base_model": "all-MiniLM-L6-v2",
+  "epochs": 3,
+  "batch_size": 32,
+  "seed": 42,
+  "input": "data/training/labeled/review_labels.csv",
+  "total_rows": 64,
+  "classes": 2,
+  "triplets_total": 64,
+  "triplets_train": 57,
+  "triplets_val": 7,
+  "holdout_ratio": 0.2,
+  "holdout_rows": 13,
+  "coverage": {
+    "Account & Login": 0,
+    "App Crash & Launch Failure": 0,
+    "Bugs & Technical Errors": 0,
+    "Content & Features": 0,
+    "Customer Support": 0,
+    "Download & Offline": 0,
+    "Notifications & Spam": 0,
+    "Performance & Speed": 0,
+    "Privacy & Security": 0,
+    "Subscription & Billing": 38,
+    "UI & Navigation": 0,
+    "Video & Streaming Playback": 26
+  }
+}
