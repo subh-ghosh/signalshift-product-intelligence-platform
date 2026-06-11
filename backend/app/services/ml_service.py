@@ -495,6 +495,7 @@ class MLService:
                 best_scores  = sim_matrix[np.arange(len(batch_reviews)), best_cat_ids]
 
                 for j in range(len(batch_reviews)):
+                    month_str = batch_dates[j]
                     # ── PHASE 24.3: Confidence Threshold Routing ──────────────
                     confidence = float(best_scores[j])
                     canonical_label = (
@@ -542,7 +543,6 @@ class MLService:
                         })
 
                     # Track timeseries (Phase 16) — keyed by canonical label
-                    month_str = batch_dates[j]
                     if month_str != "NaT" and month_str != "Unknown":
                         topic_stats[canonical_label]["monthly_mentions"][month_str] = (
                             topic_stats[canonical_label]["monthly_mentions"].get(month_str, 0) + 1
