@@ -85,7 +85,8 @@ class DataSyncService:
     def scrape_play_store(
         self,
         app_id: str = DEFAULT_PLAYSTORE_ID,
-        count: int = 2000,
+        count: int = 5000,
+        limit_months: int = 12,
         lang: str = "en",
         country: str = "us",
         progress_callback=None,
@@ -102,10 +103,14 @@ class DataSyncService:
                 "Install it with: pip install google-play-scraper"
             )
 
-        print(f"[PlayStore] Scraping up to {count} reviews for {app_id}...")
+        print(f"[PlayStore] Scraping up to {count} reviews (limit {limit_months} months) for {app_id}...")
 
         if progress_callback:
             progress_callback(5, 100, "scraping_playstore")
+
+        cutoff_date = None
+        if limit_months > 0:
+            cutoff_date = datetime.now() - timedelta(days=30 * limit_months)
 
         all_reviews = []
         continuation_token = None
@@ -126,7 +131,20 @@ class DataSyncService:
                 if not result:
                     break
 
-                all_reviews.extend(result)
+                # Filter and check for cutoff
+                filtered_result = []
+                hit_cutoff = False
+                for r in result:
+                    at_val = r.get("at")
+                    if cutoff_date and at_val:
+                        tz = at_val.tzinfo
+                        local_cutoff = cutoff_date.replace(tzinfo=tz) if tz else cutoff_date
+                        if at_val < local_cutoff:
+                            hit_cutoff = True
+                            break
+                    filtered_result.append(r)
+
+                all_reviews.extend(filtered_result)
                 fetched += len(result)
 
                 # Progress update
@@ -134,9 +152,9 @@ class DataSyncService:
                 if progress_callback:
                     progress_callback(pct, 100, "scraping_playstore")
 
-                print(f"[PlayStore] Fetched {fetched}/{count} reviews...")
+                print(f"[PlayStore] Fetched {fetched} reviews (kept {len(all_reviews)})...")
 
-                if continuation_token is None:
+                if hit_cutoff or continuation_token is None:
                     break
 
                 # Small delay to be respectful
@@ -182,7 +200,8 @@ class DataSyncService:
         self,
         app_name: str = DEFAULT_APPSTORE_NAME,
         app_id: int = DEFAULT_APPSTORE_ID,
-        count: int = 2000,
+        count: int = 5000,
+        limit_months: int = 12,
         country: str = "us",
         progress_callback=None,
     ) -> pd.DataFrame:
@@ -198,14 +217,19 @@ class DataSyncService:
                 "Install it with: pip install app-store-scraper"
             )
 
-        print(f"[AppStore] Scraping up to {count} reviews for {app_name} (ID: {app_id})...")
+        print(f"[AppStore] Scraping up to {count} reviews (limit {limit_months} months) for {app_name} (ID: {app_id})...")
 
         if progress_callback:
             progress_callback(5, 100, "scraping_appstore")
 
         try:
             app = AppStore(country=country, app_name=app_name, app_id=app_id)
-            app.review(how_many=count)
+            
+            after_date = None
+            if limit_months > 0:
+                after_date = datetime.now() - timedelta(days=30 * limit_months)
+
+            app.review(how_many=count, after=after_date)
         except Exception as e:
             print(f"[AppStore] Scraping failed: {e}")
             raise
@@ -253,7 +277,8 @@ class DataSyncService:
         playstore_id: str = DEFAULT_PLAYSTORE_ID,
         appstore_name: str = DEFAULT_APPSTORE_NAME,
         appstore_id: int = DEFAULT_APPSTORE_ID,
-        count: int = 2000,
+        count: int = 5000,
+        limit_months: int = 12,
         progress_callback=None,
     ) -> str:
         """
@@ -302,6 +327,7 @@ class DataSyncService:
                     df = self.scrape_play_store(
                         app_id=playstore_id,
                         count=count,
+                        limit_months=limit_months,
                         progress_callback=sub_cb,
                     )
                     if not df.empty:
@@ -313,6 +339,7 @@ class DataSyncService:
                         app_name=appstore_name,
                         app_id=appstore_id,
                         count=count,
+                        limit_months=limit_months,
                         progress_callback=sub_cb,
                     )
                     if not df.empty:

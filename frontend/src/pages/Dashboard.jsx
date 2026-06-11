@@ -176,7 +176,13 @@ export default function Dashboard() {
     try {
       setUploadLoading(true)
       setStatus("Scraping Play Store & App Store reviews...")
-      const res = await api.post("/sync/reviews")
+      
+      let months = 12
+      if (range === "3M") months = 3
+      if (range === "6M") months = 6
+      if (range === "12M") months = 12
+      
+      const res = await api.post(`/sync/reviews?limit_months=${months}`)
       setStatus(res.data.message || "Sync started!")
       await startPolling()
     } catch (error) {
