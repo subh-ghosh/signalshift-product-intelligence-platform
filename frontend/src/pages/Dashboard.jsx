@@ -122,7 +122,7 @@ export default function Dashboard() {
     const checkInitialStatus = async () => {
       try {
         const res = await api.get("/upload-progress")
-        if (["sentiment", "processing", "topic"].includes(res.data.status)) {
+        if (["sentiment", "processing", "topic", "scraping", "scraping_playstore", "scraping_appstore"].includes(res.data.status)) {
           setProgress(res.data)
           setUploadLoading(true)
           startPolling()
@@ -172,16 +172,16 @@ export default function Dashboard() {
     }
   }
 
-  const handleKaggleSync = async () => {
+  const handleStoreSync = async () => {
     try {
       setUploadLoading(true)
-      setStatus("Syncing Latest App Data...")
-      const res = await api.post("/sync/kaggle")
+      setStatus("Scraping Play Store & App Store reviews...")
+      const res = await api.post("/sync/reviews")
       setStatus(res.data.message || "Sync started!")
       await startPolling()
     } catch (error) {
       console.error(error)
-      setStatus("Data Sync failed")
+      setStatus("Review sync failed")
       setUploadLoading(false)
     }
   }
@@ -323,8 +323,8 @@ export default function Dashboard() {
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                       <span className="status-text">
-                        {progress.status === "downloading" || progress.status === "unzipping"
-                          ? `${progress.processed}%`
+                        {progress.status === "scraping" || progress.status === "scraping_playstore" || progress.status === "scraping_appstore"
+                          ? `Scraping reviews... ${progress.processed}%`
                           : `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()} reviews (${progressPct}%)`}
                       </span>
                       {progress.eta_seconds > 0 && (
@@ -408,8 +408,8 @@ export default function Dashboard() {
                       <button className="btn-primary" onClick={handleUpload} disabled={uploadLoading}>
                         {uploadLoading ? "Analyzing..." : "Upload"}
                       </button>
-                      <button className="btn-tertiary" onClick={handleKaggleSync} disabled={uploadLoading}>
-                        Sync latest
+                      <button className="btn-tertiary" onClick={handleStoreSync} disabled={uploadLoading}>
+                        Sync from stores
                       </button>
                       {uploadLoading && (
                         <button className="btn-secondary" onClick={handleStop}>

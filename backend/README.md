@@ -21,7 +21,7 @@ SignalShift intentionally separates model training data from dashboard/runtime d
 - Produces model artifacts in `models/`
 
 2. Runtime/dashboard path
-- Input: uploaded CSVs or Kaggle sync data
+- Input: uploaded CSVs or Play Store / App Store sync data
 - Raw runtime data: `data/testing/raw/`
 - Processed analytics outputs: `data/testing/processed/`
 - Used by dashboard endpoints under `app/api/routes.py`
@@ -41,7 +41,7 @@ When available, runtime automatically prefers `models/finetuned_encoder/` and fa
 back to base `all-MiniLM-L6-v2` otherwise.
 
 ### Runtime/Dashboard Flow
-1. Upload reviews (`/upload-reviews`) or sync (`/sync/kaggle`).
+1. Upload reviews (`/upload-reviews`) or sync from stores (`/sync/reviews`).
 2. Backend runs background sentiment + topic analysis.
 3. Analytics CSVs are written to `data/testing/processed/`.
 4. Dashboard endpoints (`/dashboard/*`) read these outputs.

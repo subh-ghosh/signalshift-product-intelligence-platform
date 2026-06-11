@@ -122,7 +122,7 @@ The SignalShift ML pipeline has been fully evolved through three tiers. Below is
 
 ## Verification Plan
 
-### Auto-checks (run on each Kaggle sync)
+### Auto-checks (run on each store sync)
 - `classification_quality.csv` — silhouette score logged; target `> 0.25`
 - `emerging_issues.csv` — review flagged clusters, update taxonomy if volume ≥ 40
 - `semantic_drift.csv` — monitor `is_evolving = True` categories for root-cause changes

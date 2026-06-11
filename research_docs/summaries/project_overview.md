@@ -18,7 +18,7 @@ A "Voice of the Customer" (VoC) dashboard for product managers. It takes thousan
   - **Drift Detection**: Monthly embedding centroid tracking
   - **Anomaly Detection**: NMF on embedding space for unknown issue clusters
   - **Fine-tuning**: Triplet loss contrastive training (ready when labeled data available)
-- **Data Sync**: Kaggle API integration
+- **Data Sync**: Google Play Store & Apple App Store scrapers
 
 ### Frontend (React/Visualization)
 - **React + Vite**, **Recharts** for dynamic charts
@@ -41,7 +41,7 @@ A "Voice of the Customer" (VoC) dashboard for product managers. It takes thousan
 ---
 
 ## 🔄 Functional Flow
-1. **Sync**: Kaggle API pulls latest app reviews CSV
+1. **Sync**: Scrapers pull latest reviews from Play Store & App Store
 2. **Sentiment**: Reviews classified negative/positive (LR, F1=0.91)
 3. **Encode**: Negative reviews encoded with MiniLM (384-dim vectors)
 4. **Classify**: Cosine similarity against 12 taxonomy centroids; confidence threshold 0.30

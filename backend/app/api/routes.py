@@ -1326,23 +1326,23 @@ def get_sync_status():
     return sync_service.get_sync_status()
 
 
-@router.post("/sync/kaggle")
-def sync_kaggle(background_tasks: BackgroundTasks):
-    """Triggers a download from Kaggle and starts analysis in the background"""
+@router.post("/sync/reviews")
+def sync_reviews(background_tasks: BackgroundTasks):
+    """Scrapes reviews from Play Store and/or App Store and starts analysis."""
     if ml_service is None:
         return {"error": "ML service not initialized"}
         
-    # Initialize progress for the download phase immediately
+    # Initialize progress for the scraping phase immediately
     ml_service.progress["processed"] = 0
     ml_service.progress["total"] = 100
-    ml_service.progress["status"] = "downloading"
+    ml_service.progress["status"] = "scraping"
     ml_service.progress["eta_seconds"] = 0
 
     # Offload the entire sync + analysis process to a background job
-    background_tasks.add_task(_process_kaggle_sync_job)
+    background_tasks.add_task(_process_review_sync_job)
     
     return {
-        "message": "Kaggle sync started. Tracking download progress...",
+        "message": "Review sync started. Scraping Play Store & App Store...",
         "status": "pending"
     }
 
@@ -1351,8 +1351,8 @@ def sync_kaggle(background_tasks: BackgroundTasks):
 # Background Processing
 # -----------------------------
 
-def _process_kaggle_sync_job():
-    """Background job for Kaggle sync: Download -> Load -> Analyze"""
+def _process_review_sync_job():
+    """Background job: Scrape from stores -> Load -> Analyze"""
     try:
         # 0. Define progress callback for sync
         def sync_progress_callback(processed, total, status):
@@ -1361,8 +1361,8 @@ def _process_kaggle_sync_job():
             ml_service.progress["status"] = status
             ml_service.progress["eta_seconds"] = 0 
 
-        # 1. Download from Kaggle
-        file_path = sync_service.sync_from_kaggle(progress_callback=sync_progress_callback)
+        # 1. Scrape reviews from available stores
+        file_path = sync_service.sync_reviews(progress_callback=sync_progress_callback)
         
         # 2. Load and process
         df = pd.read_csv(file_path)
@@ -1379,11 +1379,11 @@ def _process_kaggle_sync_job():
             # 3. Hand off to the standard analysis job
             _process_reviews_job(df)
         else:
-            print("Dataset missing review column during Kaggle sync.")
+            print("Dataset missing review column during store sync.")
             ml_service.progress["status"] = "error"
             
     except Exception as e:
-        print(f"Kaggle Sync job failed: {e}")
+        print(f"Review sync job failed: {e}")
         ml_service.progress["status"] = "error"
 
 

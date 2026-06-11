@@ -67,4 +67,4 @@ This document summarizes the complete scientific journey of SignalShift — from
 ---
 
 ## 🏁 Current Technical State
-`MLService` runs the full Tier 1–3 pipeline on every Kaggle sync. The sentiment model remains Logistic Regression (LR + TF-IDF Bi-gram, F1=0.91). Topic classification is 100% semantic via MiniLM. Fine-tuning infrastructure is ready for when labeled data is collected.
+`MLService` runs the full Tier 1–3 pipeline on every review sync (Play Store / App Store). The sentiment model remains Logistic Regression (LR + TF-IDF Bi-gram, F1=0.91). Topic classification is 100% semantic via MiniLM. Fine-tuning infrastructure is ready for when labeled data is collected.
