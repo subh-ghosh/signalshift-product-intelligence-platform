@@ -608,16 +608,17 @@ def trending_issues(limit_months: int = 0, metric: str = "severity"):
                      last_month_str = target_months[-1]
                      
                 try:
-                    y, m = last_month_str.split('-')
-                    next_m = int(m) + 1
-                    next_y = int(y)
-                    if next_m > 12:
-                        next_m = 1
-                        next_y += 1
-                    next_month_str = f"{next_y}-{next_m:02d} (Forecast)"
-                    
-                    # Build forecast row dictionary
-                    forecast_row = {"month": next_month_str}
+                    if isinstance(last_month_str, str) and "-" in last_month_str:
+                        parts = last_month_str.split('-')
+                        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                            y, m = int(parts[0]), int(parts[1])
+                            next_m = m + 1
+                            next_y = y
+                            if next_m > 12:
+                                next_m = 1
+                                next_y += 1
+                            next_month_str = f"{next_y}-{next_m:02d} (Forecast)"
+                            forecast_row = {"month": next_month_str}
                     for c in issue_cols:
                         forecast_row[c] = forecast_vals[c]
                         forecast_row[f"{c}_upper_bound"] = forecast_bounds[f"{c}_upper_bound"]
@@ -922,7 +923,8 @@ def get_intelligence_alerts(limit_months: int = 3):
                             "is_anomaly": False,
                             "link": None
                         })
-        except Exception: pass
+        except Exception as e:
+            print(f"Aspect dominance alert calculation error: {e}")
 
         # 5. Generate Unified Topic Alerts
         for topic in curr_stats.index:
@@ -1434,11 +1436,12 @@ async def upload_reviews(background_tasks: BackgroundTasks, file: UploadFile = F
     content = await file.read()
     # Processing heavy pandas CSV parsing in a worker thread
     df = await run_in_threadpool(pd.read_csv, io.BytesIO(content))
-    possible_columns = ["content", "review", "text", "comment"]
+    lower_cols = {str(c).lower().strip(): c for c in df.columns}
+    possible_columns = ["content", "review", "text", "comment", "review_text", "review_content", "comments", "reviews", "review_body", "full_text"]
     review_column = None
     for col in possible_columns:
-        if col in df.columns:
-            review_column = col
+        if col in lower_cols:
+            review_column = lower_cols[col]
             break
 
     if review_column is None:

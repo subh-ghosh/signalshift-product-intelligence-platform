@@ -26,9 +26,8 @@ export const highlightEntities = (text, keywordsString) => {
 
     // 4. Map parts to React elements, wrapping matches in a styled span
     return parts.map((part, i) => {
-        if (regexPattern.test(part)) {
-            // Reset regex state since .test() advances the index with 'g' flag
-            regexPattern.lastIndex = 0; 
+        const lowerPart = part.toLowerCase();
+        if (rawKeywords.includes(lowerPart)) {
             return (
                 <span 
                     key={i} 

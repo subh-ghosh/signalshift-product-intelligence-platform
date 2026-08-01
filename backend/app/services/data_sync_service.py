@@ -24,11 +24,8 @@ try:
 except ImportError:
     HAS_GPLAY = False
 
-try:
-    from app_store_scraper import AppStore
-    HAS_APPSTORE = True
-except ImportError:
-    HAS_APPSTORE = False
+# App Store scraper uses native requests-based iTunes RSS parsing
+HAS_APPSTORE = True
 
 
 # ── Default app configuration ────────────────────────────────────────────────
@@ -131,11 +128,16 @@ class DataSyncService:
                 if not result:
                     break
 
-                valid_reviews = [r for r in result if r['at'] >= cutoff_date]
+                def get_naive_dt(dt_val):
+                    if hasattr(dt_val, "replace"):
+                        return dt_val.replace(tzinfo=None)
+                    return dt_val
+
+                valid_reviews = [r for r in result if r.get('at') and get_naive_dt(r['at']) >= cutoff_date]
                 all_reviews.extend(valid_reviews)
 
                 if result:
-                    oldest_date = result[-1]['at']
+                    oldest_date = get_naive_dt(result[-1]['at'])
                     if oldest_date > now: oldest_date = now
                     elapsed_range = (now - oldest_date).total_seconds()
                     pct = min(max(int((elapsed_range / total_time_range) * 100), 5), 100)

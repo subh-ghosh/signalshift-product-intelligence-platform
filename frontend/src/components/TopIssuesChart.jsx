@@ -25,7 +25,7 @@ function formatPrimaryValue(issue, useImpact) {
     return `${Number(issue.sort_metric || 0).toFixed(1)}`
   }
 
-  return issue.mentions.toLocaleString()
+  return (issue.mentions || 0).toLocaleString()
 }
 
 export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {

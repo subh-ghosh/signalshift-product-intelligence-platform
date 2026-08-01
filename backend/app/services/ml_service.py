@@ -341,8 +341,16 @@ class MLService:
             dates = ["Recent"] * len(valid_df)
 
         # Phase 64: High-Detail Metadata Extraction
-        versions = valid_df["appVersion"].astype(str).tolist() if "appVersion" in valid_df.columns else ["Build N/A"] * len(valid_df)
-        upvotes = valid_df["thumbsUpCount"].fillna(0).astype(int).tolist() if "thumbsUpCount" in valid_df.columns else [0] * len(valid_df)
+        versions = (
+            valid_df["appVersion"].fillna("Build N/A").astype(str).replace({"nan": "Build N/A", "NaN": "Build N/A"}).tolist()
+            if "appVersion" in valid_df.columns
+            else ["Build N/A"] * len(valid_df)
+        )
+        upvotes = (
+            pd.to_numeric(valid_df["thumbsUpCount"], errors="coerce").fillna(0).astype(int).tolist()
+            if "thumbsUpCount" in valid_df.columns
+            else [0] * len(valid_df)
+        )
             
         filtered_out = total_negative - len(reviews)
         total_valid = len(reviews)

@@ -54,7 +54,7 @@ export default function KpiBar({ limitMonths = 0 }) {
             <KpiCard
                 icon="◫"
                 label="Total Feedback"
-                value={kpis.total_reviews.toLocaleString()}
+                value={(kpis.total_reviews ?? 0).toLocaleString()}
                 sub={kpis.window}
                 delta={d.reviews}
                 deltaIsPercent={true}
@@ -71,7 +71,7 @@ export default function KpiBar({ limitMonths = 0 }) {
             <KpiCard
                 icon="◔"
                 label="Customer Happiness"
-                value={`${kpis.positive_pct}%`}
+                value={`${kpis.positive_pct ?? 0}%`}
                 delta={d.positive_pct}
                 deltaIsPercent={false}
                 tooltip="Percentage of reviews expressing positive emotional tone."

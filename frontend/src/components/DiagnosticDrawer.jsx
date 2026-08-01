@@ -5,6 +5,8 @@ import { highlightEntities } from "../utils/highlight_utils.jsx";
 function ReviewSurface({ review, keywordsString }) {
     const isEnterprise = review.user_tier === "Enterprise" || (review.value_weight && review.value_weight >= 4);
     const isPremium = review.user_tier === "Premium" || (review.value_weight && review.value_weight >= 2);
+    const scoreNum = Math.max(0, Math.min(5, parseInt(review.score) || 0));
+    const valWeight = Number(review.value_weight) || 1;
 
     return (
         <div
@@ -18,8 +20,8 @@ function ReviewSurface({ review, keywordsString }) {
                     {isEnterprise && <span className="tag tag--warm">Enterprise</span>}
                     {isPremium && !isEnterprise && <span className="tag">Premium</span>}
                     <span style={{ color: "#e2a63c", fontSize: 12, fontWeight: 700 }}>
-                        {"★".repeat(parseInt(review.score) || 0)}
-                        {"☆".repeat(5 - (parseInt(review.score) || 0))}
+                        {"★".repeat(scoreNum)}
+                        {"☆".repeat(5 - scoreNum)}
                     </span>
                     {review.upvotes > 0 && <span className="muted-note">👍 {review.upvotes}</span>}
                 </div>
@@ -38,9 +40,9 @@ function ReviewSurface({ review, keywordsString }) {
                 "{highlightEntities(review.text || "", keywordsString || "slow, crash, bug, error, login, payment, expensive, price, quality, feature")}"
             </div>
 
-            {review.value_weight > 1 && (
+            {valWeight > 1 && (
                 <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
-                    <span className="tag tag--warm">{review.value_weight.toFixed(1)}x Business Importance</span>
+                    <span className="tag tag--warm">{valWeight.toFixed(1)}x Business Importance</span>
                 </div>
             )}
         </div>
