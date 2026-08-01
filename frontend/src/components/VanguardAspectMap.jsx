@@ -1,19 +1,7 @@
 import React, { useState, useEffect } from "react";
 import api from "../services/api";
 import { SkeletonChart } from "./Skeleton";
-
-function getSeverityMeta(score) {
-    if (score >= 4.0) return { label: "Critical", color: "#ea5b57", background: "rgba(234, 91, 87, 0.12)" };
-    if (score >= 3.0) return { label: "High", color: "#eca74c", background: "rgba(236, 167, 76, 0.14)" };
-    if (score >= 2.5) return { label: "Watch", color: "#4b78b4", background: "rgba(75, 120, 180, 0.12)" };
-    return { label: "Stable", color: "#31b57e", background: "rgba(49, 181, 126, 0.12)" };
-}
-
-function getMomentumMeta(momentumPct) {
-    if (momentumPct > 5) return { label: `Getting worse ${Math.abs(momentumPct)}%`, color: "#ea5b57", background: "rgba(234, 91, 87, 0.12)" };
-    if (momentumPct < -5) return { label: `Improving ${Math.abs(momentumPct)}%`, color: "#31b57e", background: "rgba(49, 181, 126, 0.12)" };
-    return { label: "Holding steady", color: "#72788c", background: "rgba(114, 120, 140, 0.12)" };
-}
+import { getSeverityMeta, getMomentumMeta } from "../utils/severity_utils";
 
 const VanguardAspectMap = ({ range, onAspectClick }) => {
     const [data, setData] = useState([]);
@@ -87,11 +75,11 @@ const VanguardAspectMap = ({ range, onAspectClick }) => {
                                     <div className="aspect-row__metrics">
                                         <div className="aspect-row__metric">
                                             <span>Complaint volume</span>
-                                            <strong>{item.mentions.toLocaleString()}</strong>
+                                            <strong>{(item.mentions || 0).toLocaleString()}</strong>
                                         </div>
                                         <div className="aspect-row__metric">
-                                            <span>Severity score</span>
-                                            <strong>{item.sentiment_score}/5.0</strong>
+                                            <span>Problem score</span>
+                                            <strong>{(item.sentiment_score || 0).toFixed(1)}/5.0</strong>
                                         </div>
                                         <div className="aspect-row__cta">View evidence</div>
                                     </div>

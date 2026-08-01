@@ -348,7 +348,7 @@ export default function Dashboard() {
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                       <span className="status-text">
                         {progress.status === "scraping" || progress.status === "scraping_playstore" || progress.status === "scraping_appstore"
-                          ? `Scraping reviews... ${progress.processed}%`
+                          ? `Scraping store reviews... (batch ${progress.processed})`
                           : `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()} reviews (${progressPct}%)`}
                       </span>
                       {progress.eta_seconds > 0 && (
@@ -458,6 +458,7 @@ export default function Dashboard() {
             <div className="card-header">
               <div className="card-heading">
                 <h2>Problem Landscape</h2>
+                <p className="card-subtitle">Top issues ranked by business impact, with AI-generated executive summary and live anomaly alerts.</p>
               </div>
             </div>
             <div className="dashboard-problem-layout">
@@ -491,6 +492,7 @@ export default function Dashboard() {
             <div className="card-header">
               <div className="card-heading">
                 <h2>Sentiment Health</h2>
+                <p className="card-subtitle">Overall customer mood, trend line, and months with unusual sentiment shifts.</p>
               </div>
             </div>
             <div className="dashboard-merge-stack">
@@ -517,6 +519,7 @@ export default function Dashboard() {
             <div className="card-header">
               <div className="card-heading">
                 <h2>Signals &amp; Shifts</h2>
+                <p className="card-subtitle">Month-over-month velocity of the top 3 issues — showing what is rising, falling, or newly emerging.</p>
               </div>
             </div>
             <div className="dashboard-merge-stack dashboard-merge-stack--signals">
@@ -533,7 +536,8 @@ export default function Dashboard() {
               <div className="dashboard-subpanel dashboard-subpanel--emerging">
                 <div className="card-header card-header--subpanel">
                   <div className="card-heading">
-                    <h2>Watch</h2>
+                    <h2>Rising Clusters</h2>
+                    <p className="card-subtitle">New complaint groups gaining volume — issues that weren't prominent before.</p>
                   </div>
                 </div>
                 <EmergingIssuesPanel key={`emerge-${refreshKey}-${range}`} limitMonths={limitMonths} />
@@ -541,7 +545,8 @@ export default function Dashboard() {
               <div className="dashboard-subpanel dashboard-subpanel--drift">
                 <div className="card-header card-header--subpanel">
                   <div className="card-heading">
-                    <h2>New Issues</h2>
+                    <h2>Shifting Language</h2>
+                    <p className="card-subtitle">Categories where the words customers use are changing — a leading signal of hidden new issues.</p>
                   </div>
                 </div>
                 <SemanticDriftPanel

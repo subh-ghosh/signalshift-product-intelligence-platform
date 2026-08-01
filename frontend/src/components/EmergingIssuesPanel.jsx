@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 import { SkeletonCard } from "./Skeleton"
-
-function getSignalState(volume, momentum) {
-  if (volume >= 150 || momentum >= 75) return { label: "Critical", tone: "critical" }
-  if (volume >= 80 || momentum >= 30) return { label: "Active", tone: "active" }
-  return { label: "Watch", tone: "watch" }
-}
+import { getClusterSignalState } from "../utils/severity_utils"
 
 export default function EmergingIssuesPanel({ limitMonths = 0 }) {
   const [clusters, setClusters] = useState([])
@@ -48,7 +43,7 @@ export default function EmergingIssuesPanel({ limitMonths = 0 }) {
     <div className="insight-list">
       {clusters.map((cluster, index) => {
         const isOpen = expanded === index
-        const state = getSignalState(cluster.estimated_volume, cluster.momentum_pct)
+        const state = getClusterSignalState(cluster.estimated_volume, cluster.momentum_pct)
         const preview = cluster.sample_reviews?.[0] || "No representative evidence snippet was available."
 
         return (

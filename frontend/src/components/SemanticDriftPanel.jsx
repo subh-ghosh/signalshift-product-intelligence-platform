@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 import { SkeletonCard } from "./Skeleton"
-
-function getDriftState(score) {
-  if (score > 0.18) return { label: "New issue likely", tone: "critical", helper: "Complaint language is shifting fast enough to suggest a new problem inside this category." }
-  if (score > 0.14) return { label: "Meaning is shifting", tone: "active", helper: "Customers are describing this category differently than before." }
-  return { label: "Watch wording", tone: "watch", helper: "The category is evolving, but the shift is still moderate." }
-}
+import { getDriftState } from "../utils/severity_utils"
 
 export default function SemanticDriftPanel({ limitMonths = 0, onCategoryClick }) {
   const [data, setData] = useState([])

@@ -88,7 +88,7 @@ const SentimentStabilityChart = ({ limitMonths = 0, onStabilityClick }) => {
             )}
 
             <div className="stability-card__chart">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={220}>
                     <ComposedChart data={data} margin={{ top: 14, right: 16, left: -18, bottom: 16 }}>
                         <defs>
                             <linearGradient id="stabilityGradient" x1="0" y1="0" x2="0" y2="1">

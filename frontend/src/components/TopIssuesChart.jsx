@@ -1,20 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 import { SkeletonChart } from "./Skeleton"
-
-function getSeverityMeta(severity) {
-  if (severity >= 4.0) return { label: "Critical", color: "#ea5b57", bg: "rgba(234, 91, 87, 0.12)" }
-  if (severity >= 3.0) return { label: "High", color: "#eca74c", bg: "rgba(236, 167, 76, 0.14)" }
-  if (severity >= 2.5) return { label: "Medium", color: "#4b78b4", bg: "rgba(75, 120, 180, 0.12)" }
-  return { label: "Low", color: "#31b57e", bg: "rgba(49, 181, 126, 0.12)" }
-}
-
-function getVelocityMeta(direction, label) {
-  if (direction === "up") return { label: `Rising ${label || ""}`.trim(), color: "#ea5b57", bg: "rgba(234, 91, 87, 0.12)" }
-  if (direction === "down") return { label: `Falling ${label || ""}`.trim(), color: "#31b57e", bg: "rgba(49, 181, 126, 0.12)" }
-  if (direction === "new") return { label: "New", color: "#4b78b4", bg: "rgba(75, 120, 180, 0.12)" }
-  return { label: "Stable", color: "#72788c", bg: "rgba(114, 120, 140, 0.12)" }
-}
+import { getSeverityMeta, getVelocityMeta } from "../utils/severity_utils"
 
 function formatPrimaryValue(issue, useImpact) {
   if (useImpact && issue.revenue_risk !== null && issue.revenue_risk !== undefined) {
@@ -133,10 +120,10 @@ export default function TopIssuesChart({ onIssueClick, limitMonths = 0 }) {
                   <div className="complaints-row__titleblock">
                     <div className="complaints-row__title">{issue.issue}</div>
                     <div className="complaints-row__meta">
-                      <span className="complaints-chip" style={{ color: severity.color, background: severity.bg }}>
+                      <span className="complaints-chip" style={{ color: severity.color, background: severity.background }}>
                         {severity.label}
                       </span>
-                      <span className="complaints-chip" style={{ color: velocity.color, background: velocity.bg }}>
+                      <span className="complaints-chip" style={{ color: velocity.color, background: velocity.background }}>
                         {velocity.label}
                       </span>
                     </div>
