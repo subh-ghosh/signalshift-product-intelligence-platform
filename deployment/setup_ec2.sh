@@ -41,19 +41,23 @@ sudo cp "../deployment/signalshift-backend.service" /etc/systemd/system/signalsh
 sudo systemctl daemon-reload
 sudo systemctl enable signalshift-backend
 sudo systemctl restart signalshift-backend
-echo "✔ Backend systemd service started."
+echo "✔ Backend systemd service started on port 8002."
 
-# 5. Configure Nginx Reverse Proxy (Normal Catch-All Mode)
+# 5. Configure Nginx Reverse Proxy
 echo "[5/5] Setting up Nginx reverse proxy..."
 sudo cp "../deployment/nginx.conf" /etc/nginx/sites-available/signalshift
 sudo ln -sf /etc/nginx/sites-available/signalshift /etc/nginx/sites-enabled/signalshift
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
-echo "✔ Nginx reverse proxy configured for normal API access."
+echo "✔ Nginx reverse proxy configured for direct HTTP access."
+
+PUBLIC_IP=$(curl -s ifconfig.me || echo "Your-EC2-Public-IP")
 
 echo "========================================================="
 echo "🎉 SignalShift EC2 Backend Deployment Complete!"
-echo "Verify status: sudo systemctl status signalshift-backend"
-echo "View logs:     sudo journalctl -u signalshift-backend -f"
+echo "Backend API URL: http://${PUBLIC_IP}"
+echo "Verify health:   curl http://${PUBLIC_IP}/health"
+echo "Verify status:   sudo systemctl status signalshift-backend"
+echo "View logs:       sudo journalctl -u signalshift-backend -f"
 echo "========================================================="
