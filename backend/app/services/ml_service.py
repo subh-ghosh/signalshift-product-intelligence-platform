@@ -591,7 +591,7 @@ class MLService:
 
             # Update progress
             self.progress["processed"] = min(total_valid, i + batch_size)
-            self.progress["status"] = f"Analyzing topics... {self.progress['processed']}/{total_valid}"
+            self.progress["status"] = "topic"
 
         # ── PHASE 24.2: EVIDENCE RE-RANKING + NEAR-DUPLICATE DEDUPLICATION ──────
         # topic_stats is already keyed by canonical label — no merging needed.

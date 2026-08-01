@@ -93,6 +93,28 @@ export default function Dashboard() {
           setProgress(res.data)
           failCount = 0
 
+          // Update main badge status dynamically based on pipeline stage
+          switch(res.data.status) {
+            case "scraping_playstore":
+              setStatus("Scraping Google Play Store...")
+              break
+            case "scraping_appstore":
+              setStatus("Scraping Apple App Store...")
+              break
+            case "sentiment":
+              setStatus("Analyzing Sentiment & Value Weighting...")
+              break
+            case "topic":
+              setStatus("Classifying Topics & Anomalies...")
+              break
+            case "analyzing":
+              setStatus("Finalizing Intelligence Report...")
+              break
+            case "complete":
+              setStatus("Analysis Complete!")
+              break
+          }
+
           if (res.data.status === "complete" || res.data.status === "idle") {
             clearInterval(progressInterval.current)
             onAnalysisComplete(res.data.status === "complete" ? "Analysis complete!" : "")
@@ -176,13 +198,9 @@ export default function Dashboard() {
     try {
       setUploadLoading(true)
       setStatus("Scraping Play Store & App Store reviews...")
-      
-      let months = 12
-      if (range === "3M") months = 3
-      if (range === "6M") months = 6
-      if (range === "12M") months = 12
-      
-      const res = await api.post(`/sync/reviews?limit_months=${months}`)
+      const res = await api.post("/sync/reviews", null, {
+        params: { limit_months: limitMonths }
+      })
       setStatus(res.data.message || "Sync started!")
       await startPolling()
     } catch (error) {

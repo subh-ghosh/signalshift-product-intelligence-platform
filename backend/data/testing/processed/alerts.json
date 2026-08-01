@@ -1,13 +1,21 @@
 {
     "alerts": [
         {
-            "id": "alert_1781214904_Content/Library",
+            "id": "alert_1781218934_Content/Library",
             "type": "aspect_spike",
             "category": "Content/Library",
-            "message": "Critical spike detected in Content/Library (57.9% of complaints).",
+            "message": "Critical spike detected in Content/Library (49.6% of complaints).",
             "severity": "high",
-            "timestamp": "2026-06-12T03:25:04.020629"
+            "timestamp": "2026-06-12T04:32:14.513961"
+        },
+        {
+            "id": "alert_1781218934_Pricing/Subscription",
+            "type": "aspect_spike",
+            "category": "Pricing/Subscription",
+            "message": "Critical spike detected in Pricing/Subscription (25.8% of complaints).",
+            "severity": "high",
+            "timestamp": "2026-06-12T04:32:14.514096"
         }
     ],
-    "last_check": "2026-06-12T03:25:04.020910"
+    "last_check": "2026-06-12T04:32:14.514241"
 }

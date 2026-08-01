@@ -1327,10 +1327,12 @@ def get_sync_status():
 
 
 @router.post("/sync/reviews")
-def sync_reviews(background_tasks: BackgroundTasks, limit_months: int = 12):
+def sync_reviews(background_tasks: BackgroundTasks, limit_months: int = 0, months_back: int = 0):
     """Scrapes reviews from Play Store and/or App Store and starts analysis."""
     if ml_service is None:
         return {"error": "ML service not initialized"}
+
+    target_months = limit_months if limit_months > 0 else months_back if months_back > 0 else 12
         
     # Initialize progress for the scraping phase immediately
     ml_service.progress["processed"] = 0
@@ -1339,10 +1341,10 @@ def sync_reviews(background_tasks: BackgroundTasks, limit_months: int = 12):
     ml_service.progress["eta_seconds"] = 0
 
     # Offload the entire sync + analysis process to a background job
-    background_tasks.add_task(_process_review_sync_job, limit_months=limit_months)
+    background_tasks.add_task(_process_review_sync_job, months_back=target_months)
     
     return {
-        "message": f"Review sync started for the last {limit_months} months. Scraping Play Store & App Store...",
+        "message": f"Review sync started for last {target_months}M. Scraping Play Store & App Store...",
         "status": "pending"
     }
 
@@ -1351,21 +1353,18 @@ def sync_reviews(background_tasks: BackgroundTasks, limit_months: int = 12):
 # Background Processing
 # -----------------------------
 
-def _process_review_sync_job(limit_months: int = 12):
+def _process_review_sync_job(months_back: int = 12):
     """Background job: Scrape from stores -> Load -> Analyze"""
     try:
         # 0. Define progress callback for sync
-        def sync_progress_callback(processed, total, status):
+        def sync_progress_callback(processed, total, status, eta=0):
             ml_service.progress["processed"] = processed
             ml_service.progress["total"] = total
             ml_service.progress["status"] = status
-            ml_service.progress["eta_seconds"] = 0 
+            ml_service.progress["eta_seconds"] = eta
 
         # 1. Scrape reviews from available stores
-        file_path = sync_service.sync_reviews(
-            limit_months=limit_months,
-            progress_callback=sync_progress_callback
-        )
+        file_path = sync_service.sync_reviews(months_back=months_back, progress_callback=sync_progress_callback)
         
         # 2. Load and process
         df = pd.read_csv(file_path)

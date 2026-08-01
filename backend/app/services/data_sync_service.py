@@ -85,8 +85,7 @@ class DataSyncService:
     def scrape_play_store(
         self,
         app_id: str = DEFAULT_PLAYSTORE_ID,
-        count: int = 5000,
-        limit_months: int = 12,
+        months_back: int = 12,
         lang: str = "en",
         country: str = "us",
         progress_callback=None,
@@ -103,65 +102,64 @@ class DataSyncService:
                 "Install it with: pip install google-play-scraper"
             )
 
-        print(f"[PlayStore] Scraping up to {count} reviews (limit {limit_months} months) for {app_id}...")
+        from datetime import datetime, timedelta
+        import time
+        now = datetime.now()
+        cutoff_date = now - timedelta(days=30 * months_back)
+        total_time_range = (now - cutoff_date).total_seconds()
+        print(f"[PlayStore] Scraping reviews for {app_id} since {cutoff_date.date()}...")
 
         if progress_callback:
-            progress_callback(5, 100, "scraping_playstore")
-
-        cutoff_date = None
-        if limit_months > 0:
-            cutoff_date = datetime.now() - timedelta(days=30 * limit_months)
+            progress_callback(5, 100, "scraping_playstore", 0)
 
         all_reviews = []
         continuation_token = None
         batch_size = 200  # Google Play max per request
-        fetched = 0
+        start_time = time.time()
 
-        while fetched < count:
+        while True:
             try:
                 result, continuation_token = gplay_reviews(
                     app_id,
                     lang=lang,
                     country=country,
                     sort=Sort.NEWEST,
-                    count=min(batch_size, count - fetched),
+                    count=batch_size,
                     continuation_token=continuation_token,
                 )
 
                 if not result:
                     break
 
-                # Filter and check for cutoff
-                filtered_result = []
-                hit_cutoff = False
-                for r in result:
-                    at_val = r.get("at")
-                    if cutoff_date and at_val:
-                        tz = at_val.tzinfo
-                        local_cutoff = cutoff_date.replace(tzinfo=tz) if tz else cutoff_date
-                        if at_val < local_cutoff:
-                            hit_cutoff = True
-                            break
-                    filtered_result.append(r)
+                valid_reviews = [r for r in result if r['at'] >= cutoff_date]
+                all_reviews.extend(valid_reviews)
 
-                all_reviews.extend(filtered_result)
-                fetched += len(result)
+                if result:
+                    oldest_date = result[-1]['at']
+                    if oldest_date > now: oldest_date = now
+                    elapsed_range = (now - oldest_date).total_seconds()
+                    pct = min(max(int((elapsed_range / total_time_range) * 100), 5), 100)
+                    
+                    time_taken = time.time() - start_time
+                    eta = int((time_taken / pct) * (100 - pct)) if pct > 0 else 0
 
-                # Progress update
-                pct = min(int((fetched / count) * 90) + 5, 95)
-                if progress_callback:
-                    progress_callback(pct, 100, "scraping_playstore")
+                    if progress_callback:
+                        progress_callback(pct, 100, "scraping_playstore", eta)
 
-                print(f"[PlayStore] Fetched {fetched} reviews (kept {len(all_reviews)})...")
+                print(f"[PlayStore] Fetched {len(all_reviews)} reviews so far...")
 
-                if hit_cutoff or continuation_token is None:
+                if len(valid_reviews) < len(result):
+                    # We hit reviews older than the cutoff date
+                    break
+
+                if continuation_token is None:
                     break
 
                 # Small delay to be respectful
                 time.sleep(0.3)
 
             except Exception as e:
-                print(f"[PlayStore] Batch error at {fetched}: {e}")
+                print(f"[PlayStore] Batch error: {e}")
                 break
 
         if not all_reviews:
@@ -200,8 +198,7 @@ class DataSyncService:
         self,
         app_name: str = DEFAULT_APPSTORE_NAME,
         app_id: int = DEFAULT_APPSTORE_ID,
-        count: int = 5000,
-        limit_months: int = 12,
+        months_back: int = 12,
         country: str = "us",
         progress_callback=None,
     ) -> pd.DataFrame:
@@ -211,56 +208,93 @@ class DataSyncService:
         Returns a DataFrame with columns:
             reviewId, userName, content, score, at, title
         """
-        if not HAS_APPSTORE:
-            raise ImportError(
-                "app-store-scraper is not installed. "
-                "Install it with: pip install app-store-scraper"
-            )
+        import requests
+        from datetime import datetime, timedelta
+        import time
 
-        print(f"[AppStore] Scraping up to {count} reviews (limit {limit_months} months) for {app_name} (ID: {app_id})...")
-
-        if progress_callback:
-            progress_callback(5, 100, "scraping_appstore")
-
-        try:
-            app = AppStore(country=country, app_name=app_name, app_id=app_id)
-            
-            after_date = None
-            if limit_months > 0:
-                after_date = datetime.now() - timedelta(days=30 * limit_months)
-
-            app.review(how_many=count, after=after_date)
-        except Exception as e:
-            print(f"[AppStore] Scraping failed: {e}")
-            raise
-
-        raw_reviews = app.reviews
+        now = datetime.now()
+        cutoff_date = now - timedelta(days=30 * months_back)
+        total_time_range = (now - cutoff_date).total_seconds()
+        print(f"[AppStore] Scraping reviews for {app_name} (ID: {app_id}) since {cutoff_date.date()}...")
 
         if progress_callback:
-            progress_callback(90, 100, "scraping_appstore")
+            progress_callback(5, 100, "scraping_appstore", 0)
 
-        if not raw_reviews:
+        all_reviews = []
+        start_time = time.time()
+
+        for page in range(1, 11):
+            url = f"https://itunes.apple.com/{country}/rss/customerreviews/id={app_id}/sortBy=mostRecent/page={page}/json"
+            try:
+                r = requests.get(url, timeout=10)
+                if r.status_code != 200:
+                    break
+                data = r.json()
+                entries = data.get("feed", {}).get("entry", [])
+                
+                if isinstance(entries, dict):
+                    entries = [entries]
+                    
+                if not entries:
+                    break
+
+                for entry in entries:
+                    if "im:rating" not in entry:
+                        continue
+                        
+                    date_str = entry.get("updated", {}).get("label", "")
+                    try:
+                        dt = datetime.fromisoformat(date_str).replace(tzinfo=None)
+                    except:
+                        dt = now
+                        
+                    if dt < cutoff_date:
+                        break
+                        
+                    all_reviews.append({
+                        "reviewId": entry.get("id", {}).get("label", ""),
+                        "userName": entry.get("author", {}).get("name", {}).get("label", ""),
+                        "content": entry.get("content", {}).get("label", ""),
+                        "score": int(entry.get("im:rating", {}).get("label", "0")),
+                        "thumbsUpCount": 0,
+                        "at": dt,
+                        "appVersion": entry.get("im:version", {}).get("label", ""),
+                        "title": entry.get("title", {}).get("label", "")
+                    })
+                else:
+                    if all_reviews:
+                        # Since Apple's RSS is capped at 10 pages (500 reviews),
+                        # a time-based percentage stays at 5%. We use page-based instead.
+                        pct = int((page / 10) * 100)
+                        
+                        time_taken = time.time() - start_time
+                        eta = int((time_taken / pct) * (100 - pct)) if pct > 0 else 0
+
+                        if progress_callback:
+                            progress_callback(pct, 100, "scraping_appstore", eta)
+
+                    time.sleep(0.8) # Slight delay to let the UI catch and display the fast App Store sync
+                    continue
+                
+                # Inner loop broke, hit cutoff
+                break
+                
+            except Exception as e:
+                print(f"[AppStore] Page {page} error: {e}")
+                break
+
+        print(f"[AppStore] Fetched {len(all_reviews)} reviews.")
+
+        if progress_callback:
+            progress_callback(100, 100, "scraping_appstore", 0)
+
+        if not all_reviews:
             return pd.DataFrame()
 
-        # Normalize to standard schema
-        rows = []
-        for r in raw_reviews:
-            rows.append({
-                "reviewId": r.get("userName", "") + "_" + str(r.get("date", "")),
-                "userName": r.get("userName", ""),
-                "content": r.get("review", ""),
-                "score": r.get("rating", 0),
-                "thumbsUpCount": 0,  # App Store doesn't expose this
-                "at": r.get("date"),
-                "appVersion": "",
-                "title": r.get("title", ""),
-            })
-
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(all_reviews)
         df["source"] = "app_store"
         df["app"] = app_name
 
-        # Save raw CSV
         out_path = os.path.join(self.data_dir, f"{app_id}_appstore_raw.csv")
         df.to_csv(out_path, index=False)
         print(f"[AppStore] Saved {len(df)} reviews to {out_path}")
@@ -277,8 +311,7 @@ class DataSyncService:
         playstore_id: str = DEFAULT_PLAYSTORE_ID,
         appstore_name: str = DEFAULT_APPSTORE_NAME,
         appstore_id: int = DEFAULT_APPSTORE_ID,
-        count: int = 5000,
-        limit_months: int = 12,
+        months_back: int = 12,
         progress_callback=None,
     ) -> str:
         """
@@ -287,7 +320,7 @@ class DataSyncService:
         Args:
             sources: List of sources to scrape. Options: ["play_store", "app_store"].
                      Defaults to all available scrapers.
-            count: Number of reviews to fetch per source.
+            months_back: Fetch reviews up to this many months back.
             progress_callback: Function(processed, total, status) for UI updates.
 
         Returns:
@@ -313,10 +346,10 @@ class DataSyncService:
 
         def make_sub_callback(source_idx):
             """Creates a progress callback scoped to one source."""
-            def cb(processed, total, status):
+            def cb(processed, total, status, eta=0):
                 overall = int(((source_idx * 100 + processed) / total_steps) * 100)
                 if progress_callback:
-                    progress_callback(overall, 100, status)
+                    progress_callback(overall, 100, status, eta)
             return cb
 
         for idx, source in enumerate(sources):
@@ -326,8 +359,7 @@ class DataSyncService:
                 if source == "play_store":
                     df = self.scrape_play_store(
                         app_id=playstore_id,
-                        count=count,
-                        limit_months=limit_months,
+                        months_back=months_back,
                         progress_callback=sub_cb,
                     )
                     if not df.empty:
@@ -338,8 +370,7 @@ class DataSyncService:
                     df = self.scrape_app_store(
                         app_name=appstore_name,
                         app_id=appstore_id,
-                        count=count,
-                        limit_months=limit_months,
+                        months_back=months_back,
                         progress_callback=sub_cb,
                     )
                     if not df.empty:
