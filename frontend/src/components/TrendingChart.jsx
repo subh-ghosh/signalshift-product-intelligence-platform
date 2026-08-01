@@ -219,7 +219,7 @@ export default function TrendingChart({ range }) {
             </div>
 
             <div className="trending-chart-wrap">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={300}>
                     <AreaChart data={chartRows} margin={{ top: 8, right: 12, left: -18, bottom: 16 }}>
                         <defs>
                             {visibleTopics.map((topic, index) => (
