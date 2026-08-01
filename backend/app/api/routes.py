@@ -390,7 +390,7 @@ def top_aspects(limit_months: int = 3):
             prev_window = ts_df[(ts_df["issue_label"].isin(labels)) & (ts_df["month"].isin(prev_months))]
             curr_vol = curr_window["mentions"].sum()
             prev_vol = prev_window["mentions"].sum()
-            momentum_pct = round(((curr_vol - prev_vol) / max(prev_vol, 1)) * 100, 1) if prev_vol > 0 else 100
+            momentum_pct = round(((curr_vol - prev_vol) / max(prev_vol, 1)) * 100, 1) if prev_vol > 0 else 0.0
 
             # Top Contributor
             top_topic = curr_window.groupby("issue_label")["mentions"].sum().idxmax() if not curr_window.empty else "None"
