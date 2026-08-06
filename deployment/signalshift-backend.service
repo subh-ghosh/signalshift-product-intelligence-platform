@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 User=ubuntu
-WorkingDirectory=/home/ubuntu/signalshift-product-intelligence-platform/backend
-ExecStart=/home/ubuntu/signalshift-product-intelligence-platform/backend/venv/bin/gunicorn \
+WorkingDirectory=/home/ubuntu/signalshift/backend
+ExecStart=/home/ubuntu/signalshift/backend/venv/bin/gunicorn \
           -k uvicorn.workers.UvicornWorker \
           -w 1 \
           --threads 4 \

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# SignalShift AWS EC2 micro Automated Deployment Script ($0 Cost Setup)
+# SignalShift AWS EC2 Deployment Script
+# Run from inside cloned repo: bash deployment/setup_ec2.sh
 set -e
 
 echo "========================================================="
