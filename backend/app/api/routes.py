@@ -160,16 +160,26 @@ def sentiment_distribution(limit_months: int = 0):
             curr_df = df
             prev_df = pd.DataFrame()
 
-        pos = (curr_df["sentiment"] == "positive").sum()
-        neg = (curr_df["sentiment"] == "negative").sum()
+        if "sentiment" in curr_df.columns:
+            pos = (curr_df["sentiment"] == "positive").sum()
+            neg = (curr_df["sentiment"] == "negative").sum()
+        else:
+            pos = (curr_df.get("score", 0) >= 3).sum() if "score" in curr_df.columns else 0
+            neg = (curr_df.get("score", 0) <= 2).sum() if "score" in curr_df.columns else 0
+
         total = pos + neg
         pos_pct = (pos / total * 100) if total > 0 else 0
         
         # Calculate Momentum
         momentum = 0.0
         if not prev_df.empty:
-            prev_pos = (prev_df["sentiment"] == "positive").sum()
-            prev_neg = (prev_df["sentiment"] == "negative").sum()
+            if "sentiment" in prev_df.columns:
+                prev_pos = (prev_df["sentiment"] == "positive").sum()
+                prev_neg = (prev_df["sentiment"] == "negative").sum()
+            else:
+                prev_pos = (prev_df.get("score", 0) >= 3).sum() if "score" in prev_df.columns else 0
+                prev_neg = (prev_df.get("score", 0) <= 2).sum() if "score" in prev_df.columns else 0
+
             prev_total = prev_pos + prev_neg
             prev_pos_pct = (prev_pos / prev_total * 100) if prev_total > 0 else 0
             momentum = round(pos_pct - prev_pos_pct, 1)
