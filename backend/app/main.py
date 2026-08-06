@@ -26,6 +26,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://100.26.51.167",
         "https://signalshift.subartaghosh.co.in",
+        "https://api.signalshift.subartaghosh.co.in",
     ],
     allow_origin_regex=r"https://.*\.pages\.dev",  # any Cloudflare Pages URL
     allow_credentials=True,
