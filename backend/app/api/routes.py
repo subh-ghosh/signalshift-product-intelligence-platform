@@ -288,7 +288,7 @@ def top_issues(limit_months: int = 0):
                 pass
 
         if "sort_metric" not in topic_df.columns:
-            topic_df["sort_metric"] = topic_df["mentions"]
+            topic_df["sort_metric"] = topic_df["mentions"] if "mentions" in topic_df.columns else 0
 
         topic_df = topic_df.sort_values("sort_metric", ascending=False)
         issues = []
