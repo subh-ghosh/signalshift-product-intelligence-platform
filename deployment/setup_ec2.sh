@@ -10,12 +10,12 @@ echo "========================================================="
 # 1. Allocate 3GB Swap Memory to prevent RAM OOM crashes on 1GB t2.micro / t3.micro
 echo "[1/5] Allocating 3GB Swap Memory..."
 if [ ! -f /swapfile ]; then
-    sudo fallocate -l 3G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=3072
+    sudo fallocate -l 1.5G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=1536
     sudo chmod 600 /swapfile
     sudo mkswap /swapfile
     sudo swapon /swapfile
     echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-    echo "✔ 3GB Swap configured successfully."
+    echo "✔ 1.5GB Swap configured successfully."
 else
     echo "✔ Swap file already exists."
 fi
