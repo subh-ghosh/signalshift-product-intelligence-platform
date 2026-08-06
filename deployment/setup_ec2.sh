@@ -33,7 +33,9 @@ if [ ! -d "venv" ]; then
 fi
 source venv/bin/activate
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install --no-cache-dir -r requirements.txt
+pip cache purge || true
 python -m spacy download en_core_web_sm || true
 
 # 4. Configure Systemd Service
