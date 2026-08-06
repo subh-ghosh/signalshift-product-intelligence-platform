@@ -21,7 +21,12 @@ set_ml_service(ml_service)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://100.26.51.167",
+    ],
+    allow_origin_regex=r"https://.*\.pages\.dev",  # any Cloudflare Pages URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
