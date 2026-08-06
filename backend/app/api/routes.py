@@ -181,8 +181,9 @@ def sentiment_distribution(limit_months: int = 0):
         }
     except Exception as e:
         print(f"Sentiment error: {e}")
-        pos = int((df["sentiment"] == "positive").sum()) if "sentiment" in df.columns else int((df.get("score", 0) >= 3).sum())
-        neg = int((df["sentiment"] == "negative").sum()) if "sentiment" in df.columns else int((df.get("score", 0) <= 2).sum())
+        df_fallback = get_dashboard_dataset()
+        pos = int((df_fallback["sentiment"] == "positive").sum()) if "sentiment" in df_fallback.columns else int((df_fallback.get("score", 0) >= 3).sum())
+        neg = int((df_fallback["sentiment"] == "negative").sum()) if "sentiment" in df_fallback.columns else int((df_fallback.get("score", 0) <= 2).sum())
         return {
             "positive": pos,
             "negative": neg,
